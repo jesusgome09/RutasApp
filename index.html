@@ -27,19 +27,34 @@
 
     <div id="app-container" class="w-full max-w-md min-h-screen sm:min-h-[840px] sm:max-h-[840px] bg-[#0f172a] shadow-2xl overflow-y-auto flex flex-col p-5 pb-24 relative sm:rounded-3xl border-0 sm:border-4 sm:border-slate-800 custom-scrollbar">
         
-        <!-- HEADER GLOBAL -->
-        <header class="flex items-center justify-between mb-6 mt-2">
-            <div class="flex items-center gap-2.5">
+        <!-- HEADER GLOBAL (CON MENÚ INTEGRADO) -->
+        <header class="flex items-center justify-between mb-6 mt-2 bg-slate-900/40 p-3 rounded-2xl border border-slate-800/50">
+            <div class="flex items-center gap-3">
+                <!-- Icono de Ruta / Logo -->
                 <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-sky-500/20">
                     <i class="fa-solid fa-route text-white text-sm"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">RouteTask</h1>
-                    <p class="text-[10px] text-sky-400 font-semibold tracking-wider uppercase">Panel de Relevamiento</p>
+                    <h1 class="text-base font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">RouteTask</h1>
+                    
+                    <!-- BOTONES DE MENÚ EN MINIATURA JUSTO DEBAJO DEL LOGO -->
+                    <div class="flex gap-3 mt-1">
+                        <button onclick="cambiarTab('ruta')" id="nav-ruta" class="text-[11px] font-bold text-sky-400 transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-map-pin text-[10px]"></i> Ruta
+                        </button>
+                        <button onclick="cambiarTab('historial')" id="nav-historial" class="text-[11px] font-bold text-slate-500 hover:text-slate-300 transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-history text-[10px]"></i> Historial
+                        </button>
+                        <button onclick="cambiarTab('ganancias')" id="nav-ganancias" class="text-[11px] font-bold text-slate-500 hover:text-slate-300 transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-sack-dollar text-[10px]"></i> Ganancias
+                        </button>
+                    </div>
                 </div>
             </div>
-            <div id="status-badge" class="px-3 py-1 rounded-full text-[11px] font-medium glass-card border border-slate-700 text-slate-400 flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-slate-500" id="status-dot"></span>
+
+            <!-- Badge de Estado Activa/Sin Ruta -->
+            <div id="status-badge" class="px-2.5 py-1 rounded-full text-[10px] font-medium glass-card border border-slate-700 text-slate-400 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-slate-500" id="status-dot"></span>
                 <span id="status-text">Sin Ruta</span>
             </div>
         </header>
@@ -145,7 +160,7 @@
         </main>
 
         <!-- MENÚ DE NAVEGACIÓN INFERIOR FIJO -->
-        <nav class="absolute bottom-0 left-0 right-0 h-18 bg-slate-900/90 backdrop-filter blur-xl border-t border-slate-800/80 flex items-center justify-around px-6 sm:rounded-b-3xl z-40">
+        <nav class="fixed bottom-0 left-0 right-0 h-18 bg-slate-900/90 backdrop-filter blur-xl border-t border-slate-800/80 flex items-center justify-around px-6 sm:max-w-md sm:mx-auto sm:rounded-b-3xl z-50">
             <button onclick="cambiarTab('ruta')" id="nav-ruta" class="flex flex-col items-center gap-1 text-sky-400 transition-all">
                 <i class="fa-solid fa-map-pin text-lg"></i><span class="text-[10px] font-bold">Ruta</span>
             </button>
