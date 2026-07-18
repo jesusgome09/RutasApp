@@ -12,7 +12,7 @@ const CATEGORIAS_CONFIG = {
 
 let estadoRuta = { enProgreso: false, categorias: {}, totalesIniciales: {} };
 let historialRutas = [];
-let vistaActual = "ruta"; // Control del menú inferior: ruta, historial, ganancias
+let vistaActual = "ruta"; 
 let categoriaSeleccionadaParaCompletar = null;
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -41,7 +41,6 @@ function guardarHistorialInStorage() {
 function cambiarTab(tab) {
     vistaActual = tab;
     
-    // Cambiar estilos de los botones del menú
     ['ruta', 'historial', 'ganancias'].forEach(t => {
         const btn = document.getElementById(`nav-${t}`);
         if(t === tab) {
@@ -79,21 +78,17 @@ function actualizarHeader() {
     }
 }
 
-// Función encargada de agrupar por los cortes de los días 5 y 20 a las 11:59:59 PM
 function obtenerPeriodoCorte(fechaString) {
     const d = new Date(fechaString);
     const dia = d.getDate();
     const mes = d.toLocaleString('es-ES', { month: 'long' });
     const anio = d.getFullYear();
 
-    // Corte 1: Del 20 del mes pasado a las 00:00 al día 5 de este mes a las 23:59
-    // Corte 2: Del día 6 de este mes a las 00:00 al día 20 de este mes a las 23:59
     if (dia <= 5) {
         return `Corte: 20 de Ant. al 05 de ${mes.toUpperCase()} - ${anio}`;
     } else if (dia <= 20) {
         return `Corte: 06 al 20 de ${mes.toUpperCase()} - ${anio}`;
     } else {
-        // Entra en el bloque del mes siguiente
         const proximoMes = new Date(d.getFullYear(), d.getMonth() + 1, 1).toLocaleString('es-ES', { month: 'long' });
         return `Corte: 21 al 05 de ${proximoMes.toUpperCase()} - ${anio}`;
     }
@@ -103,7 +98,6 @@ function renderizarInterfaz() {
     ocultarTodasLasVistas();
     actualizarHeader();
 
-    // Renderizado según la pestaña activa del menú
     if (vistaActual === "historial") {
         renderizarHistorial();
         return;
@@ -113,7 +107,6 @@ function renderizarInterfaz() {
         return;
     }
 
-    // Flujo normal de la pestaña "Ruta"
     if (!estadoRuta.enProgreso) {
         document.getElementById("view-vacio").classList.remove("hidden");
         return;
@@ -122,14 +115,12 @@ function renderizarInterfaz() {
     const categoriasActivas = Object.entries(estadoRuta.categorias).filter(([_, cant]) => cant > 0);
 
     if (categoriasActivas.length === 0) {
-        // SE COMPLETÓ LA RUTA AUTOMÁTICAMENTE
         archivarRutaActual(); 
         return;
     }
 
     document.getElementById("view-ruta").classList.remove("hidden");
     
-    // Calcular barra e indicador superior
     const actuales = Object.values(estadoRuta.categorias).reduce((a, b) => a + b, 0);
     const iniciales = Object.values(estadoRuta.totalesIniciales).reduce((a, b) => a + b, 0) || 1;
     const completadas = iniciales - actuales;
@@ -145,7 +136,6 @@ function renderizarInterfaz() {
 }
 
 function archivarRutaActual() {
-    // Sumamos todos los puntos que configuró inicialmente
     const totalPuntosRuta = Object.values(estadoRuta.totalesIniciales).reduce((a, b) => a + b, 0);
     
     if (totalPuntosRuta > 0) {
@@ -155,7 +145,7 @@ function archivarRutaActual() {
             detalles: { ...estadoRuta.totalesIniciales },
             totalPuntos: totalPuntosRuta
         };
-        historialRutas.unshift(nuevaRutaArchivada); // Lo pone de primero
+        historialRutas.unshift(nuevaRutaArchivada);
         guardarHistorialInStorage();
     }
 
@@ -174,7 +164,6 @@ function renderizarHistorial() {
         return;
     }
 
-    // Agrupar rutas en sus respectivos bloques de corte quincenal
     const grupos = {};
     historialRutas.forEach(ruta => {
         const periodo = obtenerPeriodoCorte(ruta.fecha);
@@ -183,7 +172,6 @@ function renderizarHistorial() {
         grupos[periodo].sumaPuntos += ruta.totalPuntos;
     });
 
-    // Pintar los bloques estructurados
     Object.entries(grupos).forEach(([nombreCorte, datos]) => {
         const bloqueCard = document.createElement("div");
         bloqueCard.className = "glass-card rounded-2xl p-4 border border-slate-800 space-y-3";
@@ -215,14 +203,12 @@ function renderizarHistorial() {
 function renderizarGanancias() {
     document.getElementById("view-ganancias").classList.remove("hidden");
 
-    // Calcular totales globales absolutos históricos
     const totalPuntosHistoricos = historialRutas.reduce((acc, r) => acc + r.totalPuntos, 0);
     const totalDineroHistorico = totalPuntosHistoricos * 10000;
 
     document.getElementById("ganancia-total").textContent = `$${totalDineroHistorico.toLocaleString('es-CO')}`;
     document.getElementById("total-puntos-completados").textContent = `${totalPuntosHistoricos} puntos liquidados en total en la app`;
 
-    // Calcular el corte actual en progreso dinámicamente
     const corteActualNombre = obtenerPeriodoCorte(new Date().toISOString());
     let puntosCorteActual = 0;
 
@@ -236,15 +222,14 @@ function renderizarGanancias() {
     document.getElementById("corte-actual-dinero").textContent = `$${(puntosCorteActual * 10000).toLocaleString('es-CO')}`;
 }
 
-function borrarHistorialCOMPLETO() {
+function borrarHistorialCompleto() {
     if(confirm("¿Seguro deseas purgar el historial completo? Se perderán todos tus cortes y balances calculados.")){
         historialRutas = [];
         guardarHistorialInStorage();
-        renderInterfaz();
+        renderizarInterfaz();
     }
 }
 
-// CÓDIGO CLÁSICO DE TARJETAS PREMIUM DE CATEGORÍAS
 function crearTarjetaPremium(nombre, cantidad, esModoConfirmacion = false) {
     const config = CATEGORIAS_CONFIG[nombre] || { icon: "fa-location-dot", color: "from-slate-500/20 to-slate-600/10 text-slate-400 border-slate-500/30" };
     const tarjeta = document.createElement("div");
@@ -288,7 +273,7 @@ function crearTarjetaPremium(nombre, cantidad, esModoConfirmacion = false) {
 }
 
 function abrirConfirmacion(categoria) {
-    categoriaSeleccionadaParaCompletar = category = categoria;
+    categoriaSeleccionadaParaCompletar = categoria;
     ocultarTodasLasVistas();
     document.getElementById("view-confirmacion").classList.remove("hidden");
 
@@ -307,7 +292,7 @@ function abrirConfirmacion(categoria) {
 
 function cancelarConfirmacion() {
     categoriaSeleccionadaParaCompletar = null;
-    renderizerInterfaz();
+    renderizarInterfaz();
 }
 
 function confirmarTarea() {
@@ -316,7 +301,7 @@ function confirmarTarea() {
         guardarEnStorage();
     }
     categoriaSeleccionadaParaCompletar = null;
-    renderizerInterfaz();
+    renderizarInterfaz();
 }
 
 function irACrearRuta() {
@@ -400,7 +385,7 @@ function guardarNuevaRuta() {
     estadoRuta = { enProgreso: true, categorias: nuevasCategorias, totalesIniciales: nuevosTotales };
     guardarEnStorage();
     vistaActual = "ruta";
-    renderizerInterfaz();
+    renderizarInterfaz();
 }
 
 function registrarServiceWorker() {
