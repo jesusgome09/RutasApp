@@ -4,12 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RouteTask Pro</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <!-- Iconos vectoriales profesionales -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
@@ -17,37 +15,17 @@
             user-select: none;
             background: radial-gradient(circle at top right, #1e1e38 0%, #0f172a 100%);
         }
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
-        }
-        .glass-card {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .glass-input {
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .glass-input:focus {
-            border-color: #38bdf8;
-            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .glass-input { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .glass-input:focus { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2); }
     </style>
 </head>
 <body class="text-slate-100 font-sans min-h-screen flex justify-center items-start sm:items-center p-0 sm:p-4">
 
-    <!-- CONTENEDOR MÓVIL PREMIUM -->
-    <div id="app-container" class="w-full max-w-md min-h-screen sm:min-h-[840px] sm:max-h-[840px] bg-[#0f172a] shadow-2xl overflow-y-auto flex flex-col p-5 relative sm:rounded-3xl border-0 sm:border-4 sm:border-slate-800 custom-scrollbar">
+    <div id="app-container" class="w-full max-w-md min-h-screen sm:min-h-[840px] sm:max-h-[840px] bg-[#0f172a] shadow-2xl overflow-y-auto flex flex-col p-5 pb-24 relative sm:rounded-3xl border-0 sm:border-4 sm:border-slate-800 custom-scrollbar">
         
         <!-- HEADER GLOBAL -->
         <header class="flex items-center justify-between mb-6 mt-2">
@@ -66,100 +44,122 @@
             </div>
         </header>
 
-        <!-- PANTALLA 1: LISTADO DE CATEGORÍAS ACTIVAS -->
-        <div id="view-ruta" class="hidden flex-col flex-grow">
-            <div class="glass-card rounded-2xl p-4 mb-5 flex items-center justify-between border border-slate-800">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center border border-sky-500/20 text-sky-400">
-                        <i class="fa-solid fa-list-check text-base"></i>
+        <!-- SECCIÓN DE VISTAS DINÁMICAS -->
+        <main class="flex-grow flex flex-col">
+            
+            <!-- PANTALLA 1: LISTADO DE CATEGORÍAS ACTIVAS -->
+            <div id="view-ruta" class="hidden flex-col flex-grow">
+                <div class="glass-card rounded-2xl p-4 mb-5 flex items-center justify-between border border-slate-800">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center border border-sky-500/20 text-sky-400">
+                            <i class="fa-solid fa-list-check text-base"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400">Progreso Recorrido</p>
+                            <p id="progreso-porcentaje" class="text-sm font-bold text-slate-200">0% Completado</p>
+                        </div>
                     </div>
+                    <button onclick="forzarFinRuta()" class="text-xs text-rose-400 hover:text-rose-300 font-medium px-2.5 py-1.5 rounded-lg hover:bg-rose-500/10 transition flex items-center gap-1">
+                        <i class="fa-solid fa-rectangle-xmark"></i> Cancelar
+                    </button>
+                </div>
+                <div id="lista-categorias" class="space-y-3.5 flex-grow overflow-y-auto pr-0.5 custom-scrollbar"></div>
+            </div>
+
+            <!-- PANTALLA 2: CONFIRMACIÓN DE PASO -->
+            <div id="view-confirmacion" class="hidden flex-col flex-grow justify-between">
+                <div id="confirmacion-lista-clon" class="space-y-3.5 opacity-30 pointer-events-none blur-[1px] overflow-hidden max-h-[300px]"></div>
+                <div class="glass-card rounded-3xl p-6 border border-slate-700/50 shadow-2xl mt-auto relative overflow-hidden flex flex-col items-center">
+                    <div class="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-sky-400 to-transparent"></div>
+                    <div class="w-14 h-14 rounded-full bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 mb-4 shadow-inner">
+                        <i class="fa-solid fa-circle-question text-2xl animate-pulse"></i>
+                    </div>
+                    <h3 class="text-slate-300 text-xs uppercase font-bold tracking-widest mb-1">Confirmar Registro</h3>
+                    <p id="confirmacion-texto" class="text-xl font-bold text-white mb-6 text-center tracking-tight px-2"></p>
+                    <div class="flex gap-3.5 w-full">
+                        <button onclick="cancelarConfirmacion()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-3 px-4 rounded-xl border border-slate-700 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 shadow-lg"><i class="fa-solid fa-xmark text-slate-400"></i> Volver</button>
+                        <button onclick="confirmarTarea()" class="flex-1 bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold py-3 px-4 rounded-xl active:scale-95 transition-all text-sm flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20"><i class="fa-solid fa-check text-white"></i> Confirmar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANTALLA 3: ESTADO VACÍO -->
+            <div id="view-vacio" class="hidden flex-col flex-grow items-center justify-center text-center px-4 w-full my-auto">
+                <div class="flex flex-col items-center justify-center w-full">
+                    <div class="w-24 h-24 rounded-3xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 flex items-center justify-center shadow-2xl mb-6 relative">
+                        <div class="absolute -inset-1 rounded-3xl bg-gradient-to-r from-sky-500 to-indigo-500 opacity-20 blur-sm"></div>
+                        <i class="fa-solid fa-map-location-dot text-4xl text-slate-400 relative"></i>
+                    </div>
+                    <h2 class="text-2xl font-black text-white mb-2.5 tracking-tight">Ruta Limpia</h2>
+                    <p class="text-slate-400 text-sm leading-relaxed max-w-[260px] mb-8">No tienes objetivos pendientes en este dispositivo. Configura un nuevo itinerario de cobertura.</p>
+                    <button onclick="irACrearRuta()" class="bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold py-3.5 px-8 rounded-xl shadow-xl shadow-sky-500/10 active:scale-95 transition-all text-base flex items-center gap-2"><i class="fa-solid fa-plus text-sm"></i> Iniciar Nueva Ruta</button>
+                </div>
+            </div>
+
+            <!-- PANTALLA 4: CONFIGURADOR DE OBJETIVOS -->
+            <div id="view-crear" class="hidden flex-col flex-grow">
+                <div class="mb-5">
+                    <h2 class="text-xl font-bold text-white tracking-tight">Nueva Planificación</h2>
+                    <p class="text-xs text-slate-400">Define la cuota de visitas de hoy</p>
+                </div>
+                <div id="formulario-categorias" class="space-y-3 overflow-y-auto max-h-[460px] pr-1 flex-grow custom-scrollbar"></div>
+                <div class="flex gap-3 mt-5 pt-4 border-t border-slate-800">
+                    <button onclick="cancelarCreacion()" id="btn-cancelar-crear" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-3 px-4 rounded-xl border border-slate-700 active:scale-95 transition-all text-sm">Cancelar</button>
+                    <button onclick="guardarNuevaRuta()" class="flex-1 bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-sky-500/15 active:scale-95 transition-all text-sm flex items-center justify-center gap-2"><i class="fa-solid fa-play text-xs"></i> Lanzar Ruta</button>
+                </div>
+            </div>
+
+            <!-- NUEVA PANTALLA 5: HISTORIAL POR CORTES -->
+            <div id="view-historial" class="hidden flex-col flex-grow">
+                <div class="mb-4 flex justify-between items-center">
                     <div>
-                        <p class="text-xs text-slate-400">Progreso Recorrido</p>
-                        <p id="progreso-porcentaje" class="text-sm font-bold text-slate-200">0% Completado</p>
+                        <h2 class="text-xl font-bold text-white tracking-tight">Historial de Cortes</h2>
+                        <p class="text-xs text-slate-400">Filtros automáticos (Cortes: Días 5 y 20)</p>
+                    </div>
+                    <button onclick="borrarHistorial COMPLETO()" class="text-xs text-rose-400 hover:bg-rose-500/10 px-2 py-1 rounded border border-rose-500/20">Limpiar todo</button>
+                </div>
+                <div id="contenedor-cortes" class="space-y-5 overflow-y-auto max-h-[560px] pr-1 custom-scrollbar">
+                    <!-- Se inyectan bloques agrupados por quincenas -->
+                </div>
+            </div>
+
+            <!-- NUEVA PANTALLA 6: MÉTRICA DE GANANCIAS -->
+            <div id="view-ganancias" class="hidden flex-col flex-grow justify-between">
+                <div>
+                    <h2 class="text-xl font-bold text-white tracking-tight mb-1">Métricas de Ganancia</h2>
+                    <p class="text-xs text-slate-400 mb-5">Cálculo basado en $10.000 COP por punto</p>
+                    
+                    <!-- Tarjeta Principal de Saldo -->
+                    <div class="glass-card rounded-2xl p-6 border border-slate-800 bg-gradient-to-br from-slate-800/80 to-slate-900/40 relative overflow-hidden mb-5">
+                        <div class="absolute -right-6 -bottom-6 text-7xl text-emerald-500/10"><i class="fa-solid fa-wallet"></i></div>
+                        <p class="text-xs font-semibold text-emerald-400 tracking-wider uppercase mb-1">Total Ganado Acumulado</p>
+                        <p id="ganancia-total" class="text-3xl font-black text-white">$0</p>
+                        <p id="total-puntos-completados" class="text-xs text-slate-400 mt-2">0 puntos liquidados en total</p>
+                    </div>
+
+                    <!-- Desglose por periodo en curso -->
+                    <h3 class="text-sm font-bold text-slate-300 mb-3 px-1">Corte Actual en Progreso</h3>
+                    <div class="glass-card rounded-xl p-4 border border-slate-800 space-y-3">
+                        <div class="flex justify-between text-sm"><span class="text-slate-400">Puntos este periodo:</span><span id="corte-actual-puntos" class="font-bold text-slate-200">0</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-slate-400">Estimado a cobrar:</span><span id="corte-actual-dinero" class="font-bold text-emerald-400">$0</span></div>
                     </div>
                 </div>
-                <button onclick="forzarFinRuta()" class="text-xs text-rose-400 hover:text-rose-300 font-medium px-2.5 py-1.5 rounded-lg hover:bg-rose-500/10 transition flex items-center gap-1">
-                    <i class="fa-solid fa-rectangle-xmark"></i> Cancelar
-                </button>
-            </div>
-            
-            <div id="lista-categorias" class="space-y-3.5 flex-grow overflow-y-auto pr-0.5 custom-scrollbar">
-                <!-- Tarjetas Inyectadas dinámicamente -->
-            </div>
-        </div>
-
-        <!-- PANTALLA 2: CONFIRMACIÓN DE PASO -->
-        <div id="view-confirmacion" class="hidden flex-col flex-grow justify-between">
-            <div id="confirmacion-lista-clon" class="space-y-3.5 opacity-30 pointer-events-none blur-[1px] overflow-hidden max-h-[300px]">
-                <!-- Contexto difuminado de fondo -->
-            </div>
-            
-            <div class="glass-card rounded-3xl p-6 border border-slate-700/50 shadow-2xl mt-auto relative overflow-hidden flex flex-col items-center">
-                <div class="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-sky-400 to-transparent"></div>
-                
-                <div class="w-14 h-14 rounded-full bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 mb-4 shadow-inner">
-                    <i class="fa-solid fa-circle-question text-2xl animate-pulse"></i>
-                </div>
-                
-                <h3 class="text-slate-300 text-xs uppercase font-bold tracking-widest mb-1">Confirmar Registro</h3>
-                <p id="confirmacion-texto" class="text-xl font-bold text-white mb-6 text-center tracking-tight px-2">¿Completaste 1 establecimiento?</p>
-                
-                <div class="flex gap-3.5 w-full">
-                    <button onclick="cancelarConfirmacion()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-3 px-4 rounded-xl border border-slate-700 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 shadow-lg">
-                        <i class="fa-solid fa-xmark text-slate-400"></i> Volver
-                    </button>
-                    <button onclick="confirmarTarea()" class="flex-1 bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold py-3 px-4 rounded-xl active:scale-95 transition-all text-sm flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20">
-                        <i class="fa-solid fa-check text-white"></i> Confirmar
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- PANTALLA 3: ESTADO VACÍO / BIENVENIDA -->
-        <div id="view-vacio" class="hidden flex-col flex-grow items-center justify-center text-center px-4 w-full my-auto">
-            <!-- Contenedor interno para asegurar alineación vertical perfecta -->
-            <div class="flex flex-col items-center justify-center w-full">
-                
-                <!-- Icono del Mapa (Ahora centrado obligatoriamente) -->
-                <div class="w-24 h-24 rounded-3xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 flex items-center justify-center shadow-2xl mb-6 relative">
-                    <div class="absolute -inset-1 rounded-3xl bg-gradient-to-r from-sky-500 to-indigo-500 opacity-20 blur-sm"></div>
-                    <i class="fa-solid fa-map-location-dot text-4xl text-slate-400 relative"></i>
-                </div>
-                
-                <!-- Textos Informativos -->
-                <h2 class="text-2xl font-black text-white mb-2.5 tracking-tight">Ruta Limpia</h2>
-                <p class="text-slate-400 text-sm leading-relaxed max-w-[260px] mb-8">
-                    No tienes objetivos pendientes en este dispositivo. Configura un nuevo itinerario de cobertura.
-                </p>
-                
-                <!-- Botón de Acción -->
-                <button onclick="irACrearRuta()" class="bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold py-3.5 px-8 rounded-xl shadow-xl shadow-sky-500/10 active:scale-95 transition-all text-base flex items-center gap-2">
-                    <i class="fa-solid fa-plus text-sm"></i> Iniciar Nueva Ruta
-                </button>
-                
-            </div>
-        </div>
-        
-        <!-- PANTALLA 4: CONFIGURADOR DE OBJETIVOS -->
-        <div id="view-crear" class="hidden flex-col flex-grow">
-            <div class="mb-5">
-                <h2 class="text-xl font-bold text-white tracking-tight">Nueva Planificación</h2>
-                <p class="text-xs text-slate-400">Define la cuota de visitas de hoy</p>
-            </div>
-            
-            <div id="formulario-categorias" class="space-y-3 overflow-y-auto max-h-[460px] pr-1 flex-grow custom-scrollbar">
-                <!-- Campos de formulario inyectados dinámicamente -->
             </div>
 
-            <div class="flex gap-3 mt-5 pt-4 border-t border-slate-800">
-                <button onclick="cancelarCreacion()" id="btn-cancelar-crear" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-3 px-4 rounded-xl border border-slate-700 active:scale-95 transition-all text-sm">
-                    Cancelar
-                </button>
-                <button onclick="guardarNuevaRuta()" class="flex-1 bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-sky-500/15 active:scale-95 transition-all text-sm flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-play text-xs"></i> Lanzar Ruta
-                </button>
-            </div>
-        </div>
+        </main>
+
+        <!-- MENÚ DE NAVEGACIÓN INFERIOR FIJO -->
+        <nav class="absolute bottom-0 left-0 right-0 h-18 bg-slate-900/90 backdrop-filter blur-xl border-t border-slate-800/80 flex items-center justify-around px-6 sm:rounded-b-3xl z-40">
+            <button onclick="cambiarTab('ruta')" id="nav-ruta" class="flex flex-col items-center gap-1 text-sky-400 transition-all">
+                <i class="fa-solid fa-map-pin text-lg"></i><span class="text-[10px] font-bold">Ruta</span>
+            </button>
+            <button onclick="cambiarTab('historial')" id="nav-historial" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300 transition-all">
+                <i class="fa-solid fa-history text-lg"></i><span class="text-[10px] font-bold">Historial</span>
+            </button>
+            <button onclick="cambiarTab('ganancias')" id="nav-ganancias" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300 transition-all">
+                <i class="fa-solid fa-sack-dollar text-lg"></i><span class="text-[10px] font-bold">Ganancias</span>
+            </button>
+        </nav>
 
     </div>
 
