@@ -1,11 +1,11 @@
 {
-  "name": "Gestor de Rutas Locales",
-  "short_name": "RutasApp",
-  "description": "Aplicación de control de conteo de rutas e inspecciones offline.",
+  "name": "RouteTask Pro",
+  "short_name": "RouteTask",
+  "description": "Panel de Relevamiento, Tareas y Resultados de Rutas.",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#93c5fd",
-  "theme-color": "#93c5fd",
+  "background_color": "#0f172a",
+  "theme-color": "#0f172a",
   "orientation": "portrait",
   "icons": [
     {
