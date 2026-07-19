@@ -1,5 +1,6 @@
 const CATEGORIAS_CONFIG = {
     "AUTOSERVICIO": { icon: "fa-truck-ramp-box", color: "from-sky-500/20 to-blue-500/10 text-sky-400 border-sky-500/30" },
+    "BAR": { icon: "fa-champagne-glasses", color: "from-pink-500/20 to-purple-500/10 text-pink-400 border-pink-500/30" },
     "CAFETERIA": { icon: "fa-mug-saucer", color: "from-amber-600/20 to-orange-500/10 text-amber-300 border-amber-600/30" },
     "COMIDAS RAPIDAS": { icon: "fa-hamburger", color: "from-orange-500/20 to-red-500/10 text-orange-400 border-orange-500/30" },
     "DROGUERIA": { icon: "fa-house-medical", color: "from-red-500/20 to-rose-500/10 text-rose-400 border-red-500/30" },
@@ -107,18 +108,14 @@ function renderizarInterfaz() {
         return;
     }
 
+    // Si la ruta no está activa en lo absoluto, va a la vista vacía
     if (!estadoRuta.enProgreso) {
         document.getElementById("view-vacio").classList.remove("hidden");
         return;
     }
 
-    const categoriasActivas = Object.entries(estadoRuta.categorias).filter(([_, cant]) => cant > 0);
-
-    if (categoriasActivas.length === 0) {
-        archivarRutaActual(); 
-        return;
-    }
-
+    // Cambiamos esto: Ahora permitimos que la pantalla de ruta se renderice 
+    // aunque todas las categorías estén en 0, para poder sacar el informe final.
     document.getElementById("view-ruta").classList.remove("hidden");
     
     const actuales = Object.values(estadoRuta.categorias).reduce((a, b) => a + b, 0);
@@ -130,9 +127,30 @@ function renderizarInterfaz() {
     const contenedorLista = document.getElementById("lista-categorias");
     contenedorLista.innerHTML = "";
 
-    categoriasActivas.forEach(([nombre, cantidad]) => {
-        contenedorLista.appendChild(crearTarjetaPremium(nombre, cantidad, false));
+    // Filtrar categorías configuradas inicialmente para mostrarlas en el panel
+    const categoriasConfiguradas = Object.entries(estadoRuta.categorias).filter(([nombre, _]) => {
+        return (estadoRuta.totalesIniciales[nombre] || 0) > 0;
     });
+
+    if (porcentaje === 100) {
+        contenedorLista.innerHTML = `
+            <div class="glass-card rounded-2xl p-6 text-center border border-emerald-500/30 bg-emerald-500/5 my-4">
+                <i class="fa-solid fa-circle-check text-4xl text-emerald-400 mb-3 animate-bounce"></i>
+                <h3 class="text-lg font-bold text-white mb-1">¡Ruta Completada!</h3>
+                <p class="text-xs text-slate-400 mb-4">Ya puedes generar la captura final para tu supervisora abajo.</p>
+                <button onclick="archivarRutaManual()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-2 px-4 rounded-xl border border-slate-700 active:scale-95 transition-all w-full">
+                    Archivar y Limpiar Tablero
+                </button>
+            </div>
+        `;
+    } else {
+        // Si no está al 100%, renderiza las tarjetas normales que tengan saldo > 0
+        categoriasConfiguradas.forEach(([nombre, cantidad]) => {
+            if (cantidad > 0) {
+                contenedorLista.appendChild(crearTarjetaPremium(nombre, cantidad, false));
+            }
+        });
+    }
 }
 
 function archivarRutaActual() {
@@ -395,5 +413,127 @@ function registrarServiceWorker() {
                 .then(reg => console.log("PWA cargada:", reg.scope))
                 .catch(err => console.error("Error worker:", err));
         });
+    }
+}
+
+
+function generarReporteImagen() {
+    if (!estadoRuta.enProgreso) {
+        alert("No hay ninguna ruta activa para generar un reporte.");
+        return;
+    }
+
+    const hoy = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    
+    const reporteDiv = document.createElement("div");
+    reporteDiv.style.position = "absolute";
+    reporteDiv.style.left = "-9999px";
+    reporteDiv.style.top = "-9999px";
+    reporteDiv.className = "w-[360px] bg-[#0f172a] text-slate-100 p-6 font-sans flex flex-col gap-5 border border-slate-800";
+    
+    // Header con tablas clásicas para asegurar espaciado en la captura
+    let htmlContenido = `
+        <div style="border-bottom: 2px solid rgba(56, 189, 248, 0.2); padding-bottom: 12px; display: table; width: 100%;">
+            <div style="display: table-cell; vertical-align: middle;">
+                <h2 style="font-size: 16px; font-weight: 900; color: #fff; margin: 0; tracking-tight">RouteTask Pro</h2>
+                <p style="font-size: 10px; color: #38bdf8; font-weight: 700; margin: 0; text-transform: uppercase; letter-spacing: 0.05em;">Reporte de Cobertura</p>
+            </div>
+            <div style="display: table-cell; text-align: right; vertical-align: middle; font-size: 11px; color: #94a3b8; font-weight: 600;">
+                ${hoy}
+            </div>
+        </div>
+    `;
+
+    // 1. SECCIÓN: PUNTOS VISITADOS (COMPLETADOS)
+    htmlContenido += `
+        <div>
+            <h3 style="font-size: 12px; font-weight: 800; color: #10b981; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.05em;"><i class="fa-solid fa-circle-check" style="margin-right: 6px;"></i>Puntos Visitados</h3>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+    `;
+    
+    let tieneVisitados = false;
+    Object.keys(CATEGORIAS_CONFIG).forEach(cat => {
+        const inicial = estadoRuta.totalesIniciales[cat] || 0;
+        const faltante = estadoRuta.categorias[cat] || 0;
+        const visitados = inicial - faltante;
+        
+        if (visitados > 0) {
+            tieneVisitados = true;
+            htmlContenido += `
+                <div style="background: rgba(30, 41, 59, 0.4); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03); display: table; width: 100%;">
+                    <div style="display: table-cell; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 12px; color: #cbd5e1;">
+                        ${cat}
+                    </div>
+                    <div style="display: table-cell; text-align: right; font-weight: 900; color: #10b981; font-size: 14px;">
+                        ${visitados}
+                    </div>
+                </div>
+            `;
+        }
+    });
+    if (!tieneVisitados) {
+        htmlContenido += `<p style="font-size: 11px; color: #64748b; font-style: italic; margin: 4px 0; padding-left: 4px;">Ninguno.</p>`;
+    }
+    htmlContenido += `</div></div>`;
+
+    // 2. SECCIÓN: PUNTOS RESTANTES (PENDIENTES)
+    htmlContenido += `
+        <div style="margin-top: 2px;">
+            <h3 style="font-size: 12px; font-weight: 800; color: #f59e0b; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.05em;"><i class="fa-solid fa-clock" style="margin-right: 6px;"></i>Puntos Restantes</h3>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+    `;
+    
+    let tieneRestantes = false;
+    Object.keys(CATEGORIAS_CONFIG).forEach(cat => {
+        const faltante = estadoRuta.categorias[cat] || 0;
+        
+        if (faltante > 0) {
+            tieneRestantes = true;
+            htmlContenido += `
+                <div style="background: rgba(30, 41, 59, 0.4); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03); display: table; width: 100%;">
+                    <div style="display: table-cell; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 12px; color: #cbd5e1;">
+                        ${cat}
+                    </div>
+                    <div style="display: table-cell; text-align: right; font-weight: 900; color: #f59e0b; font-size: 14px;">
+                        ${faltante}
+                    </div>
+                </div>
+            `;
+        }
+    });
+    if (!tieneRestantes) {
+        htmlContenido += `<p style="font-size: 12px; color: #10b981; font-weight: 700; font-style: italic; margin: 4px 0; padding-left: 4px;"><i class="fa-solid fa-star mr-1"></i> ¡Todo cubierto al 100%!</p>`;
+    }
+    htmlContenido += `</div></div>`;
+
+    htmlContenido += `
+        <div style="margin-top: 6px; text-align: center; font-size: 10px; color: #475569; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px; font-weight: 600; tracking-wide">
+            Generado automáticamente desde RouteTask Pro
+        </div>
+    `;
+
+    reporteDiv.innerHTML = htmlContenido;
+    document.body.appendChild(reporteDiv);
+
+    html2canvas(reporteDiv, {
+        backgroundColor: "#0f172a",
+        scale: 2 
+    }).then(canvas => {
+        const urlImagen = canvas.toDataURL("image/png");
+        const enlaceDescarga = document.createElement("a");
+        enlaceDescarga.download = `Reporte_Ruta_${hoy.replace(/\//g, '-')}.png`;
+        enlaceDescarga.href = urlImagen;
+        enlaceDescarga.click();
+        document.body.removeChild(reporteDiv);
+    }).catch(err => {
+        console.error("Error al generar la imagen:", err);
+        alert("Ocurrió un inconveniente al procesar la captura.");
+        document.body.removeChild(reporteDiv);
+    });
+}
+
+function archivarRutaManual() {
+    if(confirm("¿Deseas archivar este recorrido y guardarlo en el historial quincenal?")){
+        archivarRutaActual();
     }
 }
