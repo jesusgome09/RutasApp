@@ -76,18 +76,39 @@
     </div>
 
     <div id="app-container" class="w-full max-w-md min-h-screen sm:min-h-[840px] sm:max-h-[840px] bg-[#0f172a] shadow-2xl overflow-y-auto flex flex-col p-5 pb-10 relative sm:rounded-3xl border-0 sm:border-4 sm:border-slate-800 custom-scrollbar">
+
+        <!-- MODAL TUTORIAL TRAS REGISTRO -->
+    <div id="modal-tutorial" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 hidden">
+        <div class="glass-card w-full max-w-sm rounded-3xl p-6 border border-sky-500/30 shadow-2xl text-center space-y-4">
+            <div class="w-16 h-16 rounded-full bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 mx-auto text-2xl animate-bounce">
+                <i class="fa-solid fa-hand-pointer"></i>
+            </div>
+            <h3 class="text-lg font-black text-white">¡Bienvenido a RouteTask Pro!</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+                Tu perfil ha sido registrado con éxito. <br><br>
+                <span class="text-sky-400 font-bold">💡 Consejo útil:</span> Cada vez que quieras ver o descargar tu <span class="font-bold text-white">Carnet Digital de NATIVE</span>, solo debes presionar sobre <span class="font-bold text-white">tu foto de perfil</span> en la esquina superior izquierda.
+            </p>
+            <button onclick="cerrarTutorial()" class="w-full bg-gradient-to-r from-sky-500 to-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-lg active:scale-95 transition-all text-xs">
+                Entendido, ¡Comenzar!
+            </button>
+        </div>
+    </div>
         
-        <!-- HEADER GLOBAL (CON MENÚ INTEGRADO) -->
+<!-- HEADER GLOBAL -->
         <header class="flex items-center justify-between mb-5 mt-1 bg-slate-900/40 p-3 rounded-2xl border border-slate-800/50">
             <div class="flex items-center gap-2.5">
-                <div class="w-9 h-9 rounded-xl overflow-hidden border border-sky-500/30 flex items-center justify-center shadow-lg shadow-sky-500/10">
-                    <img id="header-avatar" src="icon-192.png" alt="Logo" class="w-full h-full object-cover">
-                </div>
+                <!-- AVATAR CLICABLE CON ACCESO AL CARNET -->
+                <button onclick="abrirCarnet()" title="Ver Carnet Digital" class="w-9 h-9 rounded-xl overflow-hidden border border-sky-500/40 flex items-center justify-center shadow-lg shadow-sky-500/10 active:scale-90 transition-transform relative group">
+                    <img id="header-avatar" src="icon-192.png" alt="Avatar" class="w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-sky-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <i class="fa-solid fa-id-card text-white text-xs"></i>
+                    </div>
+                </button>
                 <div>
                     <h1 class="text-sm font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">RouteTask</h1>
                     
-                    <!-- Botones de Navegación -->
-                    <div class="flex gap-2.5 mt-0.5">
+                    <!-- Solo 3 botones principales en el menú -->
+                    <div class="flex gap-3 mt-0.5">
                         <button onclick="cambiarTab('ruta')" id="nav-ruta" class="text-[10px] font-bold text-sky-400 transition-all flex items-center gap-1">
                             <i class="fa-solid fa-map-pin"></i> Ruta
                         </button>
@@ -96,9 +117,6 @@
                         </button>
                         <button onclick="cambiarTab('ganancias')" id="nav-ganancias" class="text-[10px] font-bold text-slate-500 hover:text-slate-300 transition-all flex items-center gap-1">
                             <i class="fa-solid fa-sack-dollar"></i> Ganancias
-                        </button>
-                        <button onclick="cambiarTab('carnet')" id="nav-carnet" class="text-[10px] font-bold text-slate-500 hover:text-slate-300 transition-all flex items-center gap-1">
-                            <i class="fa-solid fa-id-badge"></i> Carnet
                         </button>
                     </div>
                 </div>

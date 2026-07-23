@@ -56,6 +56,8 @@ function guardarRegistroUsuario(e) {
         return;
     }
 
+    const esPrimerRegistro = !perfilUsuario;
+
     const guardarYMostrar = (fotoBase64) => {
         perfilUsuario = {
             nombre: nombre.toUpperCase(),
@@ -68,6 +70,11 @@ function guardarRegistroUsuario(e) {
         document.getElementById("modal-registro").classList.add("hidden");
         actualizarDatosPerfilEnPantalla();
         renderizarInterfaz();
+
+        // Si es la primera vez que se registra, le mostramos el recorrido/tutorial del avatar
+        if (esPrimerRegistro) {
+            document.getElementById("modal-tutorial").classList.remove("hidden");
+        }
     };
 
     if (inputFoto.files && inputFoto.files[0]) {
@@ -79,6 +86,14 @@ function guardarRegistroUsuario(e) {
     } else {
         guardarYMostrar(perfilUsuario ? perfilUsuario.foto : null);
     }
+}
+
+function cerrarTutorial() {
+    document.getElementById("modal-tutorial").classList.add("hidden");
+}
+
+function abrirCarnet() {
+    cambiarTab('carnet');
 }
 
 function editarPerfilModal() {
@@ -114,7 +129,7 @@ function guardarHistorialInStorage() {
 function cambiarTab(tab) {
     vistaActual = tab;
     
-    ['ruta', 'historial', 'ganancias', 'carnet'].forEach(t => {
+    ['ruta', 'historial', 'ganancias'].forEach(t => {
         const btn = document.getElementById(`nav-${t}`);
         if(btn) {
             if(t === tab) {
