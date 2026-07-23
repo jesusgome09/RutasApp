@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RouteTask Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Librería para generar capturas de imagen -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
@@ -28,35 +26,86 @@
 </head>
 <body class="text-slate-100 font-sans min-h-screen flex justify-center items-start sm:items-center p-0 sm:p-4">
 
-    <div id="app-container" class="w-full max-w-md min-h-screen sm:min-h-[840px] sm:max-h-[840px] bg-[#0f172a] shadow-2xl overflow-y-auto flex flex-col p-5 pb-24 relative sm:rounded-3xl border-0 sm:border-4 sm:border-slate-800 custom-scrollbar">
+    <!-- MODAL DE REGISTRO DE PERFIL (BLOQUEANTE SI NO HAY PERFIL) -->
+    <div id="modal-registro" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 hidden overflow-y-auto">
+        <div class="glass-card w-full max-w-md rounded-3xl p-6 border border-sky-500/30 shadow-2xl space-y-4 my-auto">
+            <div class="text-center space-y-1">
+                <div class="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 mx-auto text-xl">
+                    <i class="fa-solid fa-id-card"></i>
+                </div>
+                <h2 class="text-xl font-black text-white">Registro de Encuestador</h2>
+                <p class="text-xs text-slate-400">Ingresa tus datos para personalizar tus reportes y carnet digital</p>
+            </div>
+
+            <form id="form-registro" onsubmit="guardarRegistroUsuario(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Nombre Completo</label>
+                    <input type="text" id="reg-nombre" required placeholder="Ej: Jesús Elías Gomez" class="w-full h-10 px-3 glass-input rounded-xl text-white focus:outline-none">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">N° Cédula (C.C.)</label>
+                        <input type="number" id="reg-cedula" required placeholder="1068823310" class="w-full h-10 px-3 glass-input rounded-xl text-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">RH (Tipo Sangre)</label>
+                        <select id="reg-rh" required class="w-full h-10 px-3 glass-input rounded-xl text-white bg-slate-900 focus:outline-none">
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Foto de Perfil (Para Carnet)</label>
+                    <input type="file" id="reg-foto" accept="image/*" class="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-sky-500/20 file:text-sky-300 hover:file:bg-sky-500/30">
+                </div>
+
+                <button type="submit" class="w-full mt-4 bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold py-3 rounded-xl shadow-lg shadow-sky-500/20 active:scale-95 transition-all text-sm">
+                    Guardar Perfil y Comenzar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="app-container" class="w-full max-w-md min-h-screen sm:min-h-[840px] sm:max-h-[840px] bg-[#0f172a] shadow-2xl overflow-y-auto flex flex-col p-5 pb-10 relative sm:rounded-3xl border-0 sm:border-4 sm:border-slate-800 custom-scrollbar">
         
-        <!-- HEADER GLOBAL (CON TU LOGO PREMIUM INTEGRADO) -->
-        <header class="flex items-center justify-between mb-6 mt-2 bg-slate-900/40 p-3 rounded-2xl border border-slate-800/50">
-            <div class="flex items-center gap-3">
-                <!-- Tu nuevo Logotipo Personal en lugar del icono genérico -->
+        <!-- HEADER GLOBAL (CON MENÚ INTEGRADO) -->
+        <header class="flex items-center justify-between mb-5 mt-1 bg-slate-900/40 p-3 rounded-2xl border border-slate-800/50">
+            <div class="flex items-center gap-2.5">
                 <div class="w-9 h-9 rounded-xl overflow-hidden border border-sky-500/30 flex items-center justify-center shadow-lg shadow-sky-500/10">
-                    <img src="icon-192.png" alt="Logo" class="w-full h-full object-cover">
+                    <img id="header-avatar" src="icon-192.png" alt="Logo" class="w-full h-full object-cover">
                 </div>
                 <div>
-                    <h1 class="text-base font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">RouteTask</h1>
+                    <h1 class="text-sm font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">RouteTask</h1>
                     
-                    <!-- Botones del menú superior -->
-                    <div class="flex gap-3 mt-1">
-                        <button onclick="cambiarTab('ruta')" id="nav-ruta" class="text-[11px] font-bold text-sky-400 transition-all flex items-center gap-1">
-                            <i class="fa-solid fa-map-pin text-[10px]"></i> Ruta
+                    <!-- Botones de Navegación -->
+                    <div class="flex gap-2.5 mt-0.5">
+                        <button onclick="cambiarTab('ruta')" id="nav-ruta" class="text-[10px] font-bold text-sky-400 transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-map-pin"></i> Ruta
                         </button>
-                        <button onclick="cambiarTab('historial')" id="nav-historial" class="text-[11px] font-bold text-slate-500 hover:text-slate-300 transition-all flex items-center gap-1">
-                            <i class="fa-solid fa-history text-[10px]"></i> Historial
+                        <button onclick="cambiarTab('historial')" id="nav-historial" class="text-[10px] font-bold text-slate-500 hover:text-slate-300 transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-history"></i> Historial
                         </button>
-                        <button onclick="cambiarTab('ganancias')" id="nav-ganancias" class="text-[11px] font-bold text-slate-500 hover:text-slate-300 transition-all flex items-center gap-1">
-                            <i class="fa-solid fa-sack-dollar text-[10px]"></i> Ganancias
+                        <button onclick="cambiarTab('ganancias')" id="nav-ganancias" class="text-[10px] font-bold text-slate-500 hover:text-slate-300 transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-sack-dollar"></i> Ganancias
+                        </button>
+                        <button onclick="cambiarTab('carnet')" id="nav-carnet" class="text-[10px] font-bold text-slate-500 hover:text-slate-300 transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-id-badge"></i> Carnet
                         </button>
                     </div>
                 </div>
             </div>
 
             <!-- Badge de Estado -->
-            <div id="status-badge" class="px-2.5 py-1 rounded-full text-[10px] font-medium glass-card border border-slate-700 text-slate-400 flex items-center gap-1.5">
+            <div id="status-badge" class="px-2 py-1 rounded-full text-[9px] font-medium glass-card border border-slate-700 text-slate-400 flex items-center gap-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-slate-500" id="status-dot"></span>
                 <span id="status-text">Sin Ruta</span>
             </div>
@@ -67,7 +116,7 @@
             
             <!-- PANTALLA 1: LISTADO DE CATEGORÍAS ACTIVAS -->
             <div id="view-ruta" class="hidden flex-col flex-grow">
-                <div class="glass-card rounded-2xl p-4 mb-5 flex items-center justify-between border border-slate-800">
+                <div class="glass-card rounded-2xl p-4 mb-4 flex items-center justify-between border border-slate-800">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center border border-sky-500/20 text-sky-400">
                             <i class="fa-solid fa-list-check text-base"></i>
@@ -78,16 +127,15 @@
                         </div>
                     </div>
                     <button onclick="forzarFinRuta()" class="text-xs text-rose-400 hover:text-rose-300 font-medium px-2.5 py-1.5 rounded-lg hover:bg-rose-500/10 transition flex items-center gap-1">
-                        <i class="fa-solid fa-rectangle-xmark"></i> Finalizar Jornada
+                        <i class="fa-solid fa-flag-checkered"></i> Finalizar
                     </button>
                 </div>
 
-                <!-- NUEVO: BOTÓN DE REPORTE PARA WHATSAPP -->
                 <button onclick="generarReporteImagen()" class="mb-4 w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold py-2.5 px-4 rounded-xl active:scale-95 transition-all text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20">
                     <i class="fa-brands fa-whatsapp text-sm"></i> Generar Captura para Supervisora
                 </button>
                 
-                <div id="lista-categorias" class="space-y-3.5 flex-grow overflow-y-auto pr-0.5 custom-scrollbar"></div>
+                <div id="lista-categorias" class="space-y-3 flex-grow overflow-y-auto pr-0.5 custom-scrollbar"></div>
             </div>
 
             <!-- PANTALLA 2: CONFIRMACIÓN DE PASO -->
@@ -107,7 +155,7 @@
                 </div>
             </div>
 
-<!-- PANTALLA 3: ESTADO VACÍO -->
+            <!-- PANTALLA 3: ESTADO VACÍO -->
             <div id="view-vacio" class="hidden flex-col flex-grow items-center justify-center text-center px-4 w-full my-auto">
                 <div class="flex flex-col items-center justify-center w-full">
                     <div class="w-24 h-24 rounded-3xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 flex items-center justify-center shadow-2xl mb-6 relative">
@@ -121,7 +169,6 @@
                         <button onclick="irACrearRuta()" class="bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold py-3 px-6 rounded-xl shadow-xl shadow-sky-500/10 active:scale-95 transition-all text-sm flex items-center justify-center gap-2">
                             <i class="fa-solid fa-list-check text-xs"></i> Ruta Programada
                         </button>
-                        
                         <button onclick="iniciarModoLibre()" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold py-3 px-6 rounded-xl border border-emerald-500/30 active:scale-95 transition-all text-sm flex items-center justify-center gap-2">
                             <i class="fa-solid fa-bolt text-xs"></i> Modo Libre (Espontáneo)
                         </button>
@@ -131,18 +178,18 @@
 
             <!-- PANTALLA 4: CONFIGURADOR DE OBJETIVOS -->
             <div id="view-crear" class="hidden flex-col flex-grow">
-                <div class="mb-5">
+                <div class="mb-4">
                     <h2 class="text-xl font-bold text-white tracking-tight">Nueva Planificación</h2>
                     <p class="text-xs text-slate-400">Define la cuota de visitas de hoy</p>
                 </div>
                 <div id="formulario-categorias" class="space-y-3 overflow-y-auto max-h-[460px] pr-1 flex-grow custom-scrollbar"></div>
-                <div class="flex gap-3 mt-5 pt-4 border-t border-slate-800">
+                <div class="flex gap-3 mt-4 pt-3 border-t border-slate-800">
                     <button onclick="cancelarCreacion()" id="btn-cancelar-crear" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-3 px-4 rounded-xl border border-slate-700 active:scale-95 transition-all text-sm">Cancelar</button>
                     <button onclick="guardarNuevaRuta()" class="flex-1 bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-sky-500/15 active:scale-95 transition-all text-sm flex items-center justify-center gap-2"><i class="fa-solid fa-play text-xs"></i> Lanzar Ruta</button>
                 </div>
             </div>
 
-<!-- PANTALLA 5: HISTORIAL POR CORTES -->
+            <!-- PANTALLA 5: HISTORIAL POR CORTES -->
             <div id="view-historial" class="hidden flex-col flex-grow">
                 <div class="mb-4 flex justify-between items-center gap-2">
                     <div>
@@ -158,9 +205,10 @@
                         </button>
                     </div>
                 </div>
-                <div id="contenedor-cortes" class="space-y-5 overflow-y-auto max-h-[560px] pr-1 custom-scrollbar"></div>
+                <div id="contenedor-cortes" class="space-y-4 overflow-y-auto max-h-[560px] pr-1 custom-scrollbar"></div>
             </div>
-<!-- PANTALLA 6: MÉTRICA DE GANANCIAS Y HISTORIAL DE CORTES -->
+
+            <!-- PANTALLA 6: MÉTRICA DE GANANCIAS Y CORTES PASADOS -->
             <div id="view-ganancias" class="hidden flex-col flex-grow">
                 <div class="space-y-4 overflow-y-auto max-h-[620px] pr-1 custom-scrollbar">
                     <div>
@@ -168,7 +216,6 @@
                         <p class="text-xs text-slate-400">Cálculo basado en $10.000 COP por punto</p>
                     </div>
                     
-                    <!-- Tarjeta Principal de Saldo Acumulado Total -->
                     <div class="glass-card rounded-2xl p-5 border border-slate-800 bg-gradient-to-br from-slate-800/80 to-slate-900/40 relative overflow-hidden">
                         <div class="absolute -right-6 -bottom-6 text-7xl text-emerald-500/10"><i class="fa-solid fa-wallet"></i></div>
                         <p class="text-xs font-semibold text-emerald-400 tracking-wider uppercase mb-1">Total Ganado Acumulado (Histórico)</p>
@@ -176,7 +223,6 @@
                         <p id="total-puntos-completados" class="text-xs text-slate-400 mt-1">0 puntos liquidados en total</p>
                     </div>
 
-                    <!-- Meta Quincenal Configurable -->
                     <div class="glass-card rounded-2xl p-4 border border-slate-800 space-y-3">
                         <div class="flex justify-between items-center">
                             <span class="text-xs font-bold text-sky-400 uppercase tracking-wide"><i class="fa-solid fa-bullseye mr-1.5"></i>Meta del Corte Actual</span>
@@ -193,42 +239,74 @@
                             <span id="meta-porcentaje" class="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">0%</span>
                         </div>
 
-                        <!-- Barra de Progreso -->
                         <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
                             <div id="meta-barra-fill" class="bg-gradient-to-r from-sky-500 to-emerald-400 h-full w-0 transition-all duration-500"></div>
                         </div>
                         <p id="meta-restante-texto" class="text-[11px] text-slate-400 italic text-right">Faltan $1.000.000 para cumplir la meta</p>
                     </div>
 
-                    <!-- Desglose por periodo en curso -->
                     <div class="glass-card rounded-xl p-4 border border-slate-800 space-y-2">
                         <h3 class="text-xs font-bold text-slate-300 uppercase">Corte Actual en Progreso</h3>
                         <div class="flex justify-between text-xs"><span class="text-slate-400">Puntos este periodo:</span><span id="corte-actual-puntos" class="font-bold text-slate-200">0 pts</span></div>
                         <div class="flex justify-between text-xs"><span class="text-slate-400">Estimado a cobrar:</span><span id="corte-actual-dinero" class="font-bold text-emerald-400">$0</span></div>
                     </div>
 
-                    <!-- NUEVA SECCIÓN: HISTORIAL DE GANANCIAS POR CORTES PASADOS -->
                     <div class="pt-2">
                         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-1"><i class="fa-solid fa-receipt mr-1.5"></i>Historial de Cortes Anteriores</h3>
-                        <div id="contenedor-historial-ganancias" class="space-y-2.5">
-                            <!-- Se inyectan dinámicamente las tarjetas de cortes pasados -->
-                        </div>
+                        <div id="contenedor-historial-ganancias" class="space-y-2.5"></div>
                     </div>
                 </div>
             </div>
-            
-        <!-- MENÚ DE NAVEGACIÓN INFERIOR FIJO -->
-        <nav class="fixed bottom-0 left-0 right-0 h-18 bg-slate-900/90 backdrop-filter blur-xl border-t border-slate-800/80 flex items-center justify-around px-6 sm:max-w-md sm:mx-auto sm:rounded-b-3xl z-50">
-            <button onclick="cambiarTab('ruta')" id="nav-ruta" class="flex flex-col items-center gap-1 text-sky-400 transition-all">
-                <i class="fa-solid fa-map-pin text-lg"></i><span class="text-[10px] font-bold">Ruta</span>
-            </button>
-            <button onclick="cambiarTab('historial')" id="nav-historial" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300 transition-all">
-                <i class="fa-solid fa-history text-lg"></i><span class="text-[10px] font-bold">Historial</span>
-            </button>
-            <button onclick="cambiarTab('ganancias')" id="nav-ganancias" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300 transition-all">
-                <i class="fa-solid fa-sack-dollar text-lg"></i><span class="text-[10px] font-bold">Ganancias</span>
-            </button>
-        </nav>
+
+            <!-- NUEVA PANTALLA 7: CARNET DIGITAL TIPO NATIVE -->
+            <div id="view-carnet" class="hidden flex-col flex-grow items-center justify-center p-2">
+                
+                <!-- CONTENEDOR DEL CARNET FÍSICO / VIRTUAL -->
+                <div id="carnet-diseno" class="w-[300px] h-[450px] bg-white text-slate-900 rounded-2xl overflow-hidden shadow-2xl relative flex flex-col justify-between border border-slate-200 select-none">
+                    
+                    <!-- FOTO DE FONDO CON 'N' GIGANTE GRIS DE NATIVE -->
+                    <div class="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none font-black text-[220px] text-slate-900 leading-none">
+                        N
+                    </div>
+
+                    <!-- CABECERA NEGRA NATIVE -->
+                    <div class="bg-black py-4 px-6 text-center">
+                        <h2 class="text-white font-bold tracking-[0.3em] text-lg uppercase font-sans">N A T I V E</h2>
+                    </div>
+
+                    <!-- FOTO DE PERFIL OVALADA EN EL CENTRO -->
+                    <div class="relative z-10 flex flex-col items-center mt-2">
+                        <div class="w-36 h-44 rounded-[45px] overflow-hidden border-2 border-slate-100 shadow-md bg-slate-200">
+                            <img id="carnet-foto-img" src="icon-512.png" alt="Foto Carnet" class="w-full h-full object-cover">
+                        </div>
+                    </div>
+
+                    <!-- TEXTO DE CREDENCIAL -->
+                    <div class="relative z-10 text-center pb-6 px-4 space-y-1">
+                        <h3 id="carnet-nombre" class="font-black text-sm uppercase text-slate-900 tracking-tight leading-snug">JESUS ELIA GOMEZ COGOLLO</h3>
+                        <p class="font-extrabold text-[11px] uppercase text-slate-800 tracking-wider">GESTOR EN CAMPO</p>
+                        
+                        <div class="pt-2 text-[11px] font-bold text-slate-800 space-y-0.5">
+                            <p>C.C. <span id="carnet-cedula">1068823310</span></p>
+                            <p>RH: <span id="carnet-rh">O+</span></p>
+                            <p class="font-black text-[11px] text-slate-900 tracking-widest mt-1">CONTRATISTA</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BOTONES DE ACCIÓN PARA EL CARNET -->
+                <div class="flex gap-3 mt-4 w-full max-w-[300px]">
+                    <button onclick="editarPerfilModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 px-3 rounded-xl border border-slate-700 active:scale-95 transition-all text-xs flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-pen-to-square"></i> Editar
+                    </button>
+                    <button onclick="descargarCarnetImagen()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-xl active:scale-95 transition-all text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-900/20">
+                        <i class="fa-solid fa-download"></i> Descargar
+                    </button>
+                </div>
+
+            </div>
+
+        </main>
 
     </div>
 

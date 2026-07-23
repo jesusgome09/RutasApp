@@ -13,6 +13,8 @@ const CATEGORIAS_CONFIG = {
 
 let estadoRuta = { enProgreso: false, modoLibre: false, categorias: {}, totalesIniciales: {} };
 let historialRutas = [];
+let perfilUsuario = null; // { nombre, cedula, rh, foto }
+let metaQuincenalCOP = 1000000;
 let vistaActual = "ruta"; 
 let categoriaSeleccionadaParaCompletar = null;
 
@@ -20,8 +22,6 @@ document.addEventListener("DOMContentLoaded", () => {
     inicializarDatos();
     registrarServiceWorker();
 });
-
-let metaQuincenalCOP = 1000000; // Valor por defecto: $1.000.000 COP
 
 function inicializarDatos() {
     const datosLocales = localStorage.getItem("ruta_actual_premium");
@@ -33,7 +33,74 @@ function inicializarDatos() {
     const metaGuardada = localStorage.getItem("meta_quincenal_premium");
     if (metaGuardada) metaQuincenalCOP = parseInt(metaGuardada, 10);
 
+    const perfilGuardado = localStorage.getItem("perfil_encuestador_premium");
+    if (perfilGuardado) {
+        perfilUsuario = JSON.parse(perfilGuardado);
+        actualizarDatosPerfilEnPantalla();
+    } else {
+        document.getElementById("modal-registro").classList.remove("hidden");
+    }
+
     renderizarInterfaz();
+}
+
+function guardarRegistroUsuario(e) {
+    e.preventDefault();
+    const nombre = document.getElementById("reg-nombre").value.trim();
+    const cedula = document.getElementById("reg-cedula").value.trim();
+    const rh = document.getElementById("reg-rh").value;
+    const inputFoto = document.getElementById("reg-foto");
+
+    if (!nombre || !cedula) {
+        alert("Por favor completa nombre y cédula.");
+        return;
+    }
+
+    const guardarYMostrar = (fotoBase64) => {
+        perfilUsuario = {
+            nombre: nombre.toUpperCase(),
+            cedula: cedula,
+            rh: rh,
+            foto: fotoBase64 || (perfilUsuario ? perfilUsuario.foto : "icon-512.png")
+        };
+
+        localStorage.setItem("perfil_encuestador_premium", JSON.stringify(perfilUsuario));
+        document.getElementById("modal-registro").classList.add("hidden");
+        actualizarDatosPerfilEnPantalla();
+        renderizarInterfaz();
+    };
+
+    if (inputFoto.files && inputFoto.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function (evt) {
+            guardarYMostrar(evt.target.result);
+        };
+        reader.readAsDataURL(inputFoto.files[0]);
+    } else {
+        guardarYMostrar(perfilUsuario ? perfilUsuario.foto : null);
+    }
+}
+
+function editarPerfilModal() {
+    if (perfilUsuario) {
+        document.getElementById("reg-nombre").value = perfilUsuario.nombre || "";
+        document.getElementById("reg-cedula").value = perfilUsuario.cedula || "";
+        document.getElementById("reg-rh").value = perfilUsuario.rh || "O+";
+    }
+    document.getElementById("modal-registro").classList.remove("hidden");
+}
+
+function actualizarDatosPerfilEnPantalla() {
+    if (!perfilUsuario) return;
+
+    if (perfilUsuario.foto) {
+        document.getElementById("header-avatar").src = perfilUsuario.foto;
+        document.getElementById("carnet-foto-img").src = perfilUsuario.foto;
+    }
+
+    document.getElementById("carnet-nombre").textContent = perfilUsuario.nombre || "ENCUESTADOR NATIVE";
+    document.getElementById("carnet-cedula").textContent = perfilUsuario.cedula || "N/A";
+    document.getElementById("carnet-rh").textContent = perfilUsuario.rh || "O+";
 }
 
 function guardarEnStorage() {
@@ -47,7 +114,7 @@ function guardarHistorialInStorage() {
 function cambiarTab(tab) {
     vistaActual = tab;
     
-    ['ruta', 'historial', 'ganancias'].forEach(t => {
+    ['ruta', 'historial', 'ganancias', 'carnet'].forEach(t => {
         const btn = document.getElementById(`nav-${t}`);
         if(btn) {
             if(t === tab) {
@@ -70,6 +137,7 @@ function ocultarTodasLasVistas() {
     document.getElementById("view-crear").classList.add("hidden");
     document.getElementById("view-historial").classList.add("hidden");
     document.getElementById("view-ganancias").classList.add("hidden");
+    document.getElementById("view-carnet").classList.add("hidden");
 }
 
 function actualizarHeader() {
@@ -112,6 +180,10 @@ function renderizarInterfaz() {
     }
     if (vistaActual === "ganancias") {
         renderizarGanancias();
+        return;
+    }
+    if (vistaActual === "carnet") {
+        document.getElementById("view-carnet").classList.remove("hidden");
         return;
     }
 
@@ -159,7 +231,6 @@ function renderizarInterfaz() {
             </div>
         `;
     } else {
-        // Muestra botón de actualizar cuota si hay avance parcial
         if (completadas > 0) {
             const btnActualizar = document.createElement("button");
             btnActualizar.onclick = actualizarCuotaRestante;
@@ -176,7 +247,6 @@ function renderizarInterfaz() {
     }
 }
 
-// LÓGICA DE REAJUSTE Y CORTE PARCIAL DE CUOTA
 function actualizarCuotaRestante() {
     let puntosAvance = 0;
     let mapaDetallesRealizados = {};
@@ -195,7 +265,6 @@ function actualizarCuotaRestante() {
     if (puntosAvance === 0) return;
 
     if (confirm(`¿Deseas liquidar las ${puntosAvance} visitas realizadas hoy, enviarlas al historial de ganancias y reajustar tu cuota a lo que te falta?`)) {
-        // 1. Guardar avance parcial en el historial
         const avanceArchivado = {
             id: Date.now(),
             fecha: new Date().toISOString(),
@@ -205,7 +274,6 @@ function actualizarCuotaRestante() {
         historialRutas.unshift(avanceArchivado);
         guardarHistorialInStorage();
 
-        // 2. Reajustar la cuota inicial al saldo pendiente actual
         Object.keys(estadoRuta.categorias).forEach(cat => {
             estadoRuta.totalesIniciales[cat] = estadoRuta.categorias[cat];
         });
@@ -386,11 +454,9 @@ function renderizarHistorial() {
         datos.rutas.forEach(r => {
             const fFormat = new Date(r.fecha).toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
             
-            // Tarjeta principal interactiva
             const item = document.createElement("div");
             item.className = "flex flex-col bg-slate-900/40 border border-slate-800/80 rounded-xl overflow-hidden transition-all";
             
-            // Fila superior (La que se ve siempre)
             const filaHeader = document.createElement("div");
             filaHeader.className = "flex justify-between items-center p-3 cursor-pointer hover:bg-slate-800/40 active:scale-[0.99] transition-all select-none";
             filaHeader.onclick = () => alternarDetalleHistorial(r.id);
@@ -405,7 +471,6 @@ function renderizarHistorial() {
                 </div>
             `;
             
-            // Fila inferior desplegable (Detalles y botón de imagen)
             const filaDetalle = document.createElement("div");
             filaDetalle.id = `detalle-${r.id}`;
             filaDetalle.className = "hidden bg-slate-950/60 p-3 border-t border-slate-800/60 space-y-3";
@@ -443,7 +508,6 @@ function renderizarHistorial() {
     });
 }
 
-// Función para abrir/cerrar el acordeón de detalles
 function alternarDetalleHistorial(id) {
     const detalle = document.getElementById(`detalle-${id}`);
     const chevron = document.getElementById(`chevron-${id}`);
@@ -462,26 +526,19 @@ function alternarDetalleHistorial(id) {
 function renderizarGanancias() {
     document.getElementById("view-ganancias").classList.remove("hidden");
 
-    // Total acumulado absoluto
     const totalPuntosHistoricos = historialRutas.reduce((acc, r) => acc + r.totalPuntos, 0);
     const totalDineroHistorico = totalPuntosHistoricos * 10000;
 
     document.getElementById("ganancia-total").textContent = `$${totalDineroHistorico.toLocaleString('es-CO')}`;
     document.getElementById("total-puntos-completados").textContent = `${totalPuntosHistoricos} puntos liquidados en total en la app`;
 
-    // Identificar el nombre del corte actual en curso
     const corteActualNombre = obtenerPeriodoCorte(new Date().toISOString());
     let puntosCorteActual = 0;
-
-    // Agrupar todas las rutas guardadas por su respectivo periodo de corte
     const cortesAgrupados = {};
 
     historialRutas.forEach(ruta => {
         const nombrePeriodo = obtenerPeriodoCorte(ruta.fecha);
-        
-        if (!cortesAgrupados[nombrePeriodo]) {
-            cortesAgrupados[nombrePeriodo] = 0;
-        }
+        if (!cortesAgrupados[nombrePeriodo]) cortesAgrupados[nombrePeriodo] = 0;
         cortesAgrupados[nombrePeriodo] += ruta.totalPuntos;
 
         if (nombrePeriodo === corteActualNombre) {
@@ -489,12 +546,10 @@ function renderizarGanancias() {
         }
     });
 
-    // Actualizar el bloque de la Quincena Actual
     const dineroCorteActual = puntosCorteActual * 10000;
     document.getElementById("corte-actual-puntos").textContent = `${puntosCorteActual} pts`;
     document.getElementById("corte-actual-dinero").textContent = `$${dineroCorteActual.toLocaleString('es-CO')}`;
 
-    // Cálculo de la Meta Quincenal
     const porcentajeMeta = Math.min(100, Math.round((dineroCorteActual / metaQuincenalCOP) * 100));
     const dineroFaltante = Math.max(0, metaQuincenalCOP - dineroCorteActual);
 
@@ -510,10 +565,8 @@ function renderizarGanancias() {
         document.getElementById("meta-restante-texto").className = "text-[11px] text-slate-400 italic text-right";
     }
 
-    // RENDERIZAR HISTORIAL DE GANANCIAS POR CORTES ANTERIORES
     const contenedorGananciasHistorial = document.getElementById("contenedor-historial-ganancias");
     contenedorGananciasHistorial.innerHTML = "";
-
     const periodosExistentes = Object.keys(cortesAgrupados);
 
     if (periodosExistentes.length === 0) {
@@ -557,10 +610,50 @@ function configurarMetaQuincenal() {
             metaQuincenalCOP = valorParsed;
             localStorage.setItem("meta_quincenal_premium", metaQuincenalCOP.toString());
             renderizarGanancias();
-        } else {
-            alert("Por favor ingresa un número válido mayor a cero.");
         }
     }
+}
+
+function exportarExcelCSV() {
+    if (historialRutas.length === 0) {
+        alert("No hay ningún registro en el historial para exportar.");
+        return;
+    }
+
+    const nombreUsuario = perfilUsuario ? perfilUsuario.nombre : "ENCUESTADOR NATIVE";
+    const cedulaUsuario = perfilUsuario ? perfilUsuario.cedula : "N/A";
+
+    let csvContent = "\uFEFF";
+    csvContent += "Encuestador;Cedula;ID Registro;Fecha;Hora;Corte Quincenal;Categorias y Visitas;Total Puntos;Ganancia COP\n";
+
+    historialRutas.forEach(r => {
+        const d = new Date(r.fecha);
+        const fechaFormat = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const horaFormat = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        const corteNombre = obtenerPeriodoCorte(r.fecha);
+        
+        let desgloseTexto = "";
+        if (r.detalles && Object.keys(r.detalles).length > 0) {
+            desgloseTexto = Object.entries(r.detalles)
+                .filter(([_, cant]) => cant > 0)
+                .map(([cat, cant]) => `${cat}: ${cant}`)
+                .join(" | ");
+        } else {
+            desgloseTexto = "Recorrido Consolidado";
+        }
+
+        const ganancia = r.totalPuntos * 10000;
+        csvContent += `"${nombreUsuario}";"${cedulaUsuario}";"${r.id}";"${fechaFormat}";"${horaFormat}";"${corteNombre}";"${desgloseTexto}";"${r.totalPuntos}";"$${ganancia.toLocaleString('es-CO')}"\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Reporte_Native_${nombreUsuario.replace(/ /g, '_')}_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 function borrarHistorialCompleto() {
@@ -703,6 +796,7 @@ function guardarNuevaRuta() {
     renderizarInterfaz();
 }
 
+// GENERADOR DE IMAGEN DE REPORTE (CON IDENTIFICACIÓN DE ENCUESTADOR)
 function generarReporteImagen() {
     if (!estadoRuta.enProgreso) {
         alert("No hay ninguna ruta activa para generar un reporte.");
@@ -710,6 +804,8 @@ function generarReporteImagen() {
     }
 
     const hoy = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const nombreEncuestador = perfilUsuario ? perfilUsuario.nombre : "GESTOR EN CAMPO";
+    const cedulaEncuestador = perfilUsuario ? `C.C. ${perfilUsuario.cedula}` : "";
     
     const reporteDiv = document.createElement("div");
     reporteDiv.style.position = "absolute";
@@ -720,8 +816,8 @@ function generarReporteImagen() {
     let htmlContenido = `
         <div style="border-bottom: 2px solid rgba(56, 189, 248, 0.2); padding-bottom: 12px; display: table; width: 100%;">
             <div style="display: table-cell; vertical-align: middle;">
-                <h2 style="font-size: 16px; font-weight: 900; color: #fff; margin: 0;">RouteTask Pro</h2>
-                <p style="font-size: 10px; color: #38bdf8; font-weight: 700; margin: 0; text-transform: uppercase; letter-spacing: 0.05em;">Reporte de Cobertura</p>
+                <h2 style="font-size: 15px; font-weight: 900; color: #fff; margin: 0; text-transform: uppercase;">${nombreEncuestador}</h2>
+                <p style="font-size: 10px; color: #38bdf8; font-weight: 700; margin: 0; text-transform: uppercase;">${cedulaEncuestador} - RouteTask Pro</p>
             </div>
             <div style="display: table-cell; text-align: right; vertical-align: middle; font-size: 11px; color: #94a3b8; font-weight: 600;">
                 ${hoy}
@@ -801,7 +897,7 @@ function generarReporteImagen() {
 
     htmlContenido += `
         <div style="margin-top: 6px; text-align: center; font-size: 10px; color: #475569; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px; font-weight: 600;">
-            Generado automáticamente desde RouteTask Pro
+            Gestor: ${nombreEncuestador} - NATIVE
         </div>
     `;
 
@@ -811,7 +907,7 @@ function generarReporteImagen() {
     html2canvas(reporteDiv, { backgroundColor: "#0f172a", scale: 2 }).then(canvas => {
         const urlImagen = canvas.toDataURL("image/png");
         const enlaceDescarga = document.createElement("a");
-        enlaceDescarga.download = `Reporte_Ruta_${hoy.replace(/\//g, '-')}.png`;
+        enlaceDescarga.download = `Reporte_${nombreEncuestador.replace(/ /g, '_')}_${hoy.replace(/\//g, '-')}.png`;
         enlaceDescarga.href = urlImagen;
         enlaceDescarga.click();
         document.body.removeChild(reporteDiv);
@@ -822,16 +918,6 @@ function generarReporteImagen() {
     });
 }
 
-function registrarServiceWorker() {
-    if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-            navigator.serviceWorker.register("sw.js")
-                .then(reg => console.log("PWA cargada:", reg.scope))
-                .catch(err => console.error("Error worker:", err));
-        });
-    }
-}
-
 function regenerarReporteHistorial(idRuta) {
     const rutaEncontrada = historialRutas.find(r => r.id === idRuta);
     if (!rutaEncontrada) {
@@ -840,7 +926,9 @@ function regenerarReporteHistorial(idRuta) {
     }
 
     const fechaRuta = new Date(rutaEncontrada.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    
+    const nombreEncuestador = perfilUsuario ? perfilUsuario.nombre : "GESTOR EN CAMPO";
+    const cedulaEncuestador = perfilUsuario ? `C.C. ${perfilUsuario.cedula}` : "";
+
     const reporteDiv = document.createElement("div");
     reporteDiv.style.position = "absolute";
     reporteDiv.style.left = "-9999px";
@@ -850,8 +938,8 @@ function regenerarReporteHistorial(idRuta) {
     let htmlContenido = `
         <div style="border-bottom: 2px solid rgba(56, 189, 248, 0.2); padding-bottom: 12px; display: table; width: 100%;">
             <div style="display: table-cell; vertical-align: middle;">
-                <h2 style="font-size: 16px; font-weight: 900; color: #fff; margin: 0;">RouteTask Pro</h2>
-                <p style="font-size: 10px; color: #38bdf8; font-weight: 700; margin: 0; text-transform: uppercase; letter-spacing: 0.05em;">Reporte de Cobertura</p>
+                <h2 style="font-size: 15px; font-weight: 900; color: #fff; margin: 0; text-transform: uppercase;">${nombreEncuestador}</h2>
+                <p style="font-size: 10px; color: #38bdf8; font-weight: 700; margin: 0; text-transform: uppercase;">${cedulaEncuestador} - RouteTask Pro</p>
             </div>
             <div style="display: table-cell; text-align: right; vertical-align: middle; font-size: 11px; color: #94a3b8; font-weight: 600;">
                 ${fechaRuta}
@@ -889,7 +977,7 @@ function regenerarReporteHistorial(idRuta) {
 
     htmlContenido += `
         <div style="margin-top: 6px; text-align: center; font-size: 10px; color: #475569; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px; font-weight: 600;">
-            Generado automáticamente desde RouteTask Pro
+            Gestor: ${nombreEncuestador} - NATIVE
         </div>
     `;
 
@@ -899,7 +987,7 @@ function regenerarReporteHistorial(idRuta) {
     html2canvas(reporteDiv, { backgroundColor: "#0f172a", scale: 2 }).then(canvas => {
         const urlImagen = canvas.toDataURL("image/png");
         const enlaceDescarga = document.createElement("a");
-        enlaceDescarga.download = `Reporte_Ruta_${fechaRuta.replace(/\//g, '-')}.png`;
+        enlaceDescarga.download = `Reporte_${nombreEncuestador.replace(/ /g, '_')}_${fechaRuta.replace(/\//g, '-')}.png`;
         enlaceDescarga.href = urlImagen;
         enlaceDescarga.click();
         document.body.removeChild(reporteDiv);
@@ -909,45 +997,33 @@ function regenerarReporteHistorial(idRuta) {
         document.body.removeChild(reporteDiv);
     });
 }
-function exportarExcelCSV() {
-    if (historialRutas.length === 0) {
-        alert("No hay ningún registro en el historial para exportar.");
-        return;
-    }
 
-    // Encabezados del archivo CSV
-    let csvContent = "\uFEFF"; // BOM UTF-8 para que Excel abra los acentos correctamente
-    csvContent += "ID Registro;Fecha;Hora;Corte Quincenal;Categorias y Visitas;Total Puntos;Ganancia COP\n";
+// FUNCIÓN PARA DESCARGAR EL CARNET OFICIAL TIPO NATIVE EN IMAGEN
+function descargarCarnetImagen() {
+    const carnetElem = document.getElementById("carnet-diseno");
+    const nombreArch = perfilUsuario ? perfilUsuario.nombre.replace(/ /g, '_') : 'Encuestador';
 
-    historialRutas.forEach(r => {
-        const d = new Date(r.fecha);
-        const fechaFormat = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        const horaFormat = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-        const corteNombre = obtenerPeriodoCorte(r.fecha);
-        
-        let desgloseTexto = "";
-        if (r.detalles && Object.keys(r.detalles).length > 0) {
-            desgloseTexto = Object.entries(r.detalles)
-                .filter(([_, cant]) => cant > 0)
-                .map(([cat, cant]) => `${cat}: ${cant}`)
-                .join(" | ");
-        } else {
-            desgloseTexto = "Recorrido Consolidado";
-        }
-
-        const ganancia = r.totalPuntos * 10000;
-
-        // Fila formateada
-        csvContent += `"${r.id}";"${fechaFormat}";"${horaFormat}";"${corteNombre}";"${desgloseTexto}";"${r.totalPuntos}";"$${ganancia.toLocaleString('es-CO')}"\n`;
+    html2canvas(carnetElem, {
+        scale: 3, // Alta definición para impresión o presentación
+        backgroundColor: null
+    }).then(canvas => {
+        const urlImagen = canvas.toDataURL("image/png");
+        const enlaceDescarga = document.createElement("a");
+        enlaceDescarga.download = `Carnet_NATIVE_${nombreArch}.png`;
+        enlaceDescarga.href = urlImagen;
+        enlaceDescarga.click();
+    }).catch(err => {
+        console.error("Error descargando carnet:", err);
+        alert("Error al procesar la imagen del carnet.");
     });
+}
 
-    // Descargar el archivo generado
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Reporte_Rutas_RouteTask_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+function registrarServiceWorker() {
+    if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+            navigator.serviceWorker.register("sw.js")
+                .then(reg => console.log("PWA cargada:", reg.scope))
+                .catch(err => console.error("Error worker:", err));
+        });
+    }
 }

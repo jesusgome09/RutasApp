@@ -1,4 +1,4 @@
-const CACHE_NAME = "rutas-app-v3";
+const CACHE_NAME = "rutas-app-v4";
 const ASSETS = [
     "./",
     "./index.html",
