@@ -78,7 +78,7 @@
                         </div>
                     </div>
                     <button onclick="forzarFinRuta()" class="text-xs text-rose-400 hover:text-rose-300 font-medium px-2.5 py-1.5 rounded-lg hover:bg-rose-500/10 transition flex items-center gap-1">
-                        <i class="fa-solid fa-rectangle-xmark"></i> Cancelar
+                        <i class="fa-solid fa-rectangle-xmark"></i> Finalizar Jornada
                     </button>
                 </div>
 
@@ -107,7 +107,7 @@
                 </div>
             </div>
 
-            <!-- PANTALLA 3: ESTADO VACÍO -->
+<!-- PANTALLA 3: ESTADO VACÍO -->
             <div id="view-vacio" class="hidden flex-col flex-grow items-center justify-center text-center px-4 w-full my-auto">
                 <div class="flex flex-col items-center justify-center w-full">
                     <div class="w-24 h-24 rounded-3xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 flex items-center justify-center shadow-2xl mb-6 relative">
@@ -115,8 +115,17 @@
                         <i class="fa-solid fa-map-location-dot text-4xl text-slate-400 relative"></i>
                     </div>
                     <h2 class="text-2xl font-black text-white mb-2.5 tracking-tight">Ruta Limpia</h2>
-                    <p class="text-slate-400 text-sm leading-relaxed max-w-[260px] mb-8">No tienes objetivos pendientes en este dispositivo. Configura un nuevo itinerario de cobertura.</p>
-                    <button onclick="irACrearRuta()" class="bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold py-3.5 px-8 rounded-xl shadow-xl shadow-sky-500/10 active:scale-95 transition-all text-base flex items-center gap-2"><i class="fa-solid fa-plus text-sm"></i> Iniciar Nueva Ruta</button>
+                    <p class="text-slate-400 text-sm leading-relaxed max-w-[260px] mb-6">Selecciona la modalidad de trabajo para iniciar hoy.</p>
+                    
+                    <div class="flex flex-col gap-3 w-full max-w-[240px]">
+                        <button onclick="irACrearRuta()" class="bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold py-3 px-6 rounded-xl shadow-xl shadow-sky-500/10 active:scale-95 transition-all text-sm flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-list-check text-xs"></i> Ruta Programada
+                        </button>
+                        
+                        <button onclick="iniciarModoLibre()" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold py-3 px-6 rounded-xl border border-emerald-500/30 active:scale-95 transition-all text-sm flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-bolt text-xs"></i> Modo Libre (Espontáneo)
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -133,40 +142,72 @@
                 </div>
             </div>
 
-            <!-- PANTALLA 5: HISTORIAL POR CORTES -->
+<!-- PANTALLA 5: HISTORIAL POR CORTES -->
             <div id="view-historial" class="hidden flex-col flex-grow">
-                <div class="mb-4 flex justify-between items-center">
+                <div class="mb-4 flex justify-between items-center gap-2">
                     <div>
                         <h2 class="text-xl font-bold text-white tracking-tight">Historial de Cortes</h2>
                         <p class="text-xs text-slate-400">Filtros automáticos (Cortes: Días 5 y 20)</p>
                     </div>
-                    <button onclick="borrarHistorialCompleto()" class="text-xs text-rose-400 hover:bg-rose-500/10 px-2 py-1 rounded border border-rose-500/20">Limpiar todo</button>
+                    <div class="flex gap-2">
+                        <button onclick="exportarExcelCSV()" class="text-xs text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1.5 rounded-lg border border-emerald-500/30 font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-file-excel"></i> Excel
+                        </button>
+                        <button onclick="borrarHistorialCompleto()" class="text-xs text-rose-400 hover:bg-rose-500/10 px-2 py-1.5 rounded border border-rose-500/20">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
                 <div id="contenedor-cortes" class="space-y-5 overflow-y-auto max-h-[560px] pr-1 custom-scrollbar"></div>
             </div>
-
-            <!-- PANTALLA 6: MÉTRICA DE GANANCIAS -->
+<!-- PANTALLA 6: MÉTRICA DE GANANCIAS -->
             <div id="view-ganancias" class="hidden flex-col flex-grow justify-between">
-                <div>
-                    <h2 class="text-xl font-bold text-white tracking-tight mb-1">Métricas de Ganancia</h2>
-                    <p class="text-xs text-slate-400 mb-5">Cálculo basado en $10.000 COP por punto</p>
+                <div class="space-y-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white tracking-tight mb-1">Métricas de Ganancia</h2>
+                        <p class="text-xs text-slate-400">Cálculo basado en $10.000 COP por punto</p>
+                    </div>
                     
-                    <div class="glass-card rounded-2xl p-6 border border-slate-800 bg-gradient-to-br from-slate-800/80 to-slate-900/40 relative overflow-hidden mb-5">
+                    <!-- Tarjeta Principal de Saldo -->
+                    <div class="glass-card rounded-2xl p-5 border border-slate-800 bg-gradient-to-br from-slate-800/80 to-slate-900/40 relative overflow-hidden">
                         <div class="absolute -right-6 -bottom-6 text-7xl text-emerald-500/10"><i class="fa-solid fa-wallet"></i></div>
                         <p class="text-xs font-semibold text-emerald-400 tracking-wider uppercase mb-1">Total Ganado Acumulado</p>
                         <p id="ganancia-total" class="text-3xl font-black text-white">$0</p>
-                        <p id="total-puntos-completados" class="text-xs text-slate-400 mt-2">0 puntos liquidados en total</p>
+                        <p id="total-puntos-completados" class="text-xs text-slate-400 mt-1">0 puntos liquidados en total</p>
                     </div>
 
-                    <h3 class="text-sm font-bold text-slate-300 mb-3 px-1">Corte Actual en Progreso</h3>
-                    <div class="glass-card rounded-xl p-4 border border-slate-800 space-y-3">
-                        <div class="flex justify-between text-sm"><span class="text-slate-400">Puntos este periodo:</span><span id="corte-actual-puntos" class="font-bold text-slate-200">0</span></div>
-                        <div class="flex justify-between text-sm"><span class="text-slate-400">Estimado a cobrar:</span><span id="corte-actual-dinero" class="font-bold text-emerald-400">$0</span></div>
+                    <!-- Meta Quincenal Configurable -->
+                    <div class="glass-card rounded-2xl p-4 border border-slate-800 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-sky-400 uppercase tracking-wide"><i class="fa-solid fa-bullseye mr-1.5"></i>Meta del Corte Actual</span>
+                            <button onclick="configurarMetaQuincenal()" class="text-[11px] text-slate-400 hover:text-white underline">
+                                Cambiar Meta
+                            </button>
+                        </div>
+                        
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <p class="text-[10px] text-slate-400">Progreso Financiero</p>
+                                <p id="meta-texto-monto" class="text-lg font-black text-white">$0 / $1.000.000</p>
+                            </div>
+                            <span id="meta-porcentaje" class="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">0%</span>
+                        </div>
+
+                        <!-- Barra de Progreso -->
+                        <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                            <div id="meta-barra-fill" class="bg-gradient-to-r from-sky-500 to-emerald-400 h-full w-0 transition-all duration-500"></div>
+                        </div>
+                        <p id="meta-restante-texto" class="text-[11px] text-slate-400 italic text-right">Faltan $1.000.000 para cumplir la meta</p>
+                    </div>
+
+                    <!-- Desglose por periodo en curso -->
+                    <div class="glass-card rounded-xl p-4 border border-slate-800 space-y-2">
+                        <h3 class="text-xs font-bold text-slate-300 uppercase">Corte Actual en Progreso</h3>
+                        <div class="flex justify-between text-xs"><span class="text-slate-400">Puntos este periodo:</span><span id="corte-actual-puntos" class="font-bold text-slate-200">0 pts</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-slate-400">Estimado a cobrar:</span><span id="corte-actual-dinero" class="font-bold text-emerald-400">$0</span></div>
                     </div>
                 </div>
             </div>
-
-        </main>
 
         <!-- MENÚ DE NAVEGACIÓN INFERIOR FIJO -->
         <nav class="fixed bottom-0 left-0 right-0 h-18 bg-slate-900/90 backdrop-filter blur-xl border-t border-slate-800/80 flex items-center justify-around px-6 sm:max-w-md sm:mx-auto sm:rounded-b-3xl z-50">

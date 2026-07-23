@@ -11,7 +11,7 @@ const CATEGORIAS_CONFIG = {
     "TIENDA": { icon: "fa-shop", color: "from-emerald-500/20 to-teal-500/10 text-emerald-400 border-emerald-500/30" }
 };
 
-let estadoRuta = { enProgreso: false, categorias: {}, totalesIniciales: {} };
+let estadoRuta = { enProgreso: false, modoLibre: false, categorias: {}, totalesIniciales: {} };
 let historialRutas = [];
 let vistaActual = "ruta"; 
 let categoriaSeleccionadaParaCompletar = null;
@@ -21,12 +21,17 @@ document.addEventListener("DOMContentLoaded", () => {
     registrarServiceWorker();
 });
 
+let metaQuincenalCOP = 1000000; // Valor por defecto: $1.000.000 COP
+
 function inicializarDatos() {
     const datosLocales = localStorage.getItem("ruta_actual_premium");
     if (datosLocales) estadoRuta = JSON.parse(datosLocales);
 
     const datosHistorial = localStorage.getItem("historial_rutas_premium");
     if (datosHistorial) historialRutas = JSON.parse(datosHistorial);
+
+    const metaGuardada = localStorage.getItem("meta_quincenal_premium");
+    if (metaGuardada) metaQuincenalCOP = parseInt(metaGuardada, 10);
 
     renderizarInterfaz();
 }
@@ -44,12 +49,14 @@ function cambiarTab(tab) {
     
     ['ruta', 'historial', 'ganancias'].forEach(t => {
         const btn = document.getElementById(`nav-${t}`);
-        if(t === tab) {
-            btn.classList.remove('text-slate-500', 'hover:text-slate-300');
-            btn.classList.add('text-sky-400');
-        } else {
-            btn.classList.remove('text-sky-400');
-            btn.classList.add('text-slate-500', 'hover:text-slate-300');
+        if(btn) {
+            if(t === tab) {
+                btn.classList.remove('text-slate-500', 'hover:text-slate-300');
+                btn.classList.add('text-sky-400');
+            } else {
+                btn.classList.remove('text-sky-400');
+                btn.classList.add('text-slate-500', 'hover:text-slate-300');
+            }
         }
     });
 
@@ -71,7 +78,7 @@ function actualizarHeader() {
     if (estadoRuta.enProgreso) {
         dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]";
         text.className = "text-emerald-400 font-semibold";
-        text.textContent = "Activa";
+        text.textContent = estadoRuta.modoLibre ? "Modo Libre" : "Activa";
     } else {
         dot.className = "w-2 h-2 rounded-full bg-slate-500";
         text.className = "text-slate-400";
@@ -108,26 +115,34 @@ function renderizarInterfaz() {
         return;
     }
 
-    // Si la ruta no está activa en lo absoluto, va a la vista vacía
     if (!estadoRuta.enProgreso) {
         document.getElementById("view-vacio").classList.remove("hidden");
         return;
     }
 
-    // Cambiamos esto: Ahora permitimos que la pantalla de ruta se renderice 
-    // aunque todas las categorías estén en 0, para poder sacar el informe final.
     document.getElementById("view-ruta").classList.remove("hidden");
-    
+    const contenedorLista = document.getElementById("lista-categorias");
+    contenedorLista.innerHTML = "";
+
+    // MODO LIBRE
+    if (estadoRuta.modoLibre) {
+        const totalPuntosCompletados = Object.values(estadoRuta.categorias).reduce((a, b) => a + b, 0);
+        document.getElementById("progreso-porcentaje").textContent = `Modo Libre: ${totalPuntosCompletados} Puntos Registrados`;
+
+        Object.keys(CATEGORIAS_CONFIG).forEach(nombre => {
+            const cantidadRealizada = estadoRuta.categorias[nombre] || 0;
+            contenedorLista.appendChild(crearTarjetaModoLibre(nombre, cantidadRealizada));
+        });
+        return;
+    }
+
+    // MODO PROGRAMADO (CUOTA FIJA)
     const actuales = Object.values(estadoRuta.categorias).reduce((a, b) => a + b, 0);
     const iniciales = Object.values(estadoRuta.totalesIniciales).reduce((a, b) => a + b, 0) || 1;
     const completadas = iniciales - actuales;
     const porcentaje = Math.round((completadas / iniciales) * 100);
     document.getElementById("progreso-porcentaje").textContent = `${porcentaje}% Completado (${completadas}/${iniciales})`;
-    
-    const contenedorLista = document.getElementById("lista-categorias");
-    contenedorLista.innerHTML = "";
 
-    // Filtrar categorías configuradas inicialmente para mostrarlas en el panel
     const categoriasConfiguradas = Object.entries(estadoRuta.categorias).filter(([nombre, _]) => {
         return (estadoRuta.totalesIniciales[nombre] || 0) > 0;
     });
@@ -144,7 +159,15 @@ function renderizarInterfaz() {
             </div>
         `;
     } else {
-        // Si no está al 100%, renderiza las tarjetas normales que tengan saldo > 0
+        // Muestra botón de actualizar cuota si hay avance parcial
+        if (completadas > 0) {
+            const btnActualizar = document.createElement("button");
+            btnActualizar.onclick = actualizarCuotaRestante;
+            btnActualizar.className = "mb-3 w-full bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold py-2 px-3 rounded-xl border border-sky-500/30 active:scale-95 transition-all text-xs flex items-center justify-center gap-2";
+            btnActualizar.innerHTML = `<i class="fa-solid fa-arrows-rotate"></i> Liquidar ${completadas} visitas realizadas y reajustar cuota`;
+            contenedorLista.appendChild(btnActualizar);
+        }
+
         categoriasConfiguradas.forEach(([nombre, cantidad]) => {
             if (cantidad > 0) {
                 contenedorLista.appendChild(crearTarjetaPremium(nombre, cantidad, false));
@@ -153,22 +176,177 @@ function renderizarInterfaz() {
     }
 }
 
+// LÓGICA DE REAJUSTE Y CORTE PARCIAL DE CUOTA
+function actualizarCuotaRestante() {
+    let puntosAvance = 0;
+    let mapaDetallesRealizados = {};
+
+    Object.keys(estadoRuta.totalesIniciales).forEach(cat => {
+        const inicial = estadoRuta.totalesIniciales[cat] || 0;
+        const faltante = estadoRuta.categorias[cat] || 0;
+        const realizado = inicial - faltante;
+
+        if (realizado > 0) {
+            mapaDetallesRealizados[cat] = realizado;
+            puntosAvance += realizado;
+        }
+    });
+
+    if (puntosAvance === 0) return;
+
+    if (confirm(`¿Deseas liquidar las ${puntosAvance} visitas realizadas hoy, enviarlas al historial de ganancias y reajustar tu cuota a lo que te falta?`)) {
+        // 1. Guardar avance parcial en el historial
+        const avanceArchivado = {
+            id: Date.now(),
+            fecha: new Date().toISOString(),
+            detalles: mapaDetallesRealizados,
+            totalPuntos: puntosAvance
+        };
+        historialRutas.unshift(avanceArchivado);
+        guardarHistorialInStorage();
+
+        // 2. Reajustar la cuota inicial al saldo pendiente actual
+        Object.keys(estadoRuta.categorias).forEach(cat => {
+            estadoRuta.totalesIniciales[cat] = estadoRuta.categorias[cat];
+        });
+
+        guardarEnStorage();
+        renderizarInterfaz();
+    }
+}
+
 function archivarRutaActual() {
-    const totalPuntosRuta = Object.values(estadoRuta.totalesIniciales).reduce((a, b) => a + b, 0);
+    let mapaDetallesRealizados = {};
+    let totalPuntosReales = 0;
+
+    if (estadoRuta.modoLibre) {
+        mapaDetallesRealizados = { ...estadoRuta.categorias };
+        totalPuntosReales = Object.values(estadoRuta.categorias).reduce((a, b) => a + b, 0);
+    } else {
+        Object.keys(estadoRuta.totalesIniciales).forEach(cat => {
+            const inicial = estadoRuta.totalesIniciales[cat] || 0;
+            const faltante = estadoRuta.categorias[cat] || 0;
+            const realizado = inicial - faltante;
+            if (realizado > 0) {
+                mapaDetallesRealizados[cat] = realizado;
+                totalPuntosReales += realizado;
+            }
+        });
+    }
     
-    if (totalPuntosRuta > 0) {
+    if (totalPuntosReales > 0) {
         const nuevaRutaArchivada = {
             id: Date.now(),
             fecha: new Date().toISOString(),
-            detalles: { ...estadoRuta.totalesIniciales },
-            totalPuntos: totalPuntosRuta
+            detalles: mapaDetallesRealizados,
+            totalPuntos: totalPuntosReales
         };
         historialRutas.unshift(nuevaRutaArchivada);
         guardarHistorialInStorage();
     }
 
-    estadoRuta = { enProgreso: false, categorias: {}, totalesIniciales: {} };
+    estadoRuta = { enProgreso: false, modoLibre: false, categorias: {}, totalesIniciales: {} };
     guardarEnStorage();
+    renderizarInterfaz();
+}
+
+function crearTarjetaModoLibre(nombre, cantidadRealizada) {
+    const config = CATEGORIAS_CONFIG[nombre] || { icon: "fa-location-dot", color: "from-slate-500/20 to-slate-600/10 text-slate-400 border-slate-500/30" };
+    const tarjeta = document.createElement("div");
+    tarjeta.className = "glass-card rounded-2xl p-3.5 flex items-center justify-between border border-slate-800/60 hover:border-slate-700 active:scale-[0.98] hover:bg-slate-800/40 cursor-pointer transition-all select-none";
+    
+    tarjeta.onclick = () => abrirConfirmacion(nombre);
+
+    const ladoIzquierdo = document.createElement("div");
+    ladoIzquierdo.className = "flex items-center gap-3.5";
+
+    const divIcono = document.createElement("div");
+    divIcono.className = `w-11 h-11 rounded-xl bg-gradient-to-br ${config.color} border flex items-center justify-center text-lg shadow-inner`;
+    const icono = document.createElement("i");
+    icono.className = `fa-solid ${config.icon}`;
+    divIcono.appendChild(icono);
+
+    const divTexto = document.createElement("div");
+    const pNombre = document.createElement("p");
+    pNombre.className = "text-sm font-bold text-slate-200 tracking-wide uppercase";
+    pNombre.textContent = nombre.toLowerCase();
+    const pSub = document.createElement("p");
+    pSub.className = "text-[11px] text-emerald-400 font-semibold";
+    pSub.textContent = "Toca para registrar +1";
+    divTexto.appendChild(pNombre);
+    divTexto.appendChild(pSub);
+    ladoIzquierdo.appendChild(divIcono);
+    ladoIzquierdo.appendChild(divTexto);
+
+    const divContador = document.createElement("div");
+    divContador.className = "min-w-[48px] h-9 bg-emerald-500/20 border border-emerald-500/40 rounded-xl flex items-center justify-center text-sm font-extrabold text-emerald-400 px-2 shadow-inner";
+    divContador.textContent = cantidadRealizada;
+
+    tarjeta.appendChild(ladoIzquierdo);
+    tarjeta.appendChild(divContador);
+    return tarjeta;
+}
+
+function abrirConfirmacion(categoria) {
+    categoriaSeleccionadaParaCompletar = categoria;
+    ocultarTodasLasVistas();
+    document.getElementById("view-confirmacion").classList.remove("hidden");
+
+    let palabraSingular = categoria.toLowerCase();
+    if (palabraSingular.endsWith('s') && palabraSingular !== "comidas rapidas") {
+        palabraSingular = palabraSingular.slice(0, -1);
+    }
+
+    if (estadoRuta.modoLibre) {
+        document.getElementById("confirmacion-texto").textContent = `¿Registrar +1 ${palabraSingular}?`;
+    } else {
+        document.getElementById("confirmacion-texto").textContent = `¿Completaste 1 ${palabraSingular}?`;
+    }
+
+    const contenedorClon = document.getElementById("confirmacion-lista-clon");
+    contenedorClon.innerHTML = "";
+    
+    if (estadoRuta.modoLibre) {
+        contenedorClon.appendChild(crearTarjetaModoLibre(categoria, (estadoRuta.categorias[categoria] || 0)));
+    } else {
+        Object.entries(estadoRuta.categorias).filter(([_, cant]) => cant > 0).forEach(([nombre, cantidad]) => {
+            contenedorClon.appendChild(crearTarjetaPremium(nombre, Math.max(0, cantidad), true));
+        });
+    }
+}
+
+function cancelarConfirmacion() {
+    categoriaSeleccionadaParaCompletar = null;
+    renderizarInterfaz();
+}
+
+function confirmarTarea() {
+    if (categoriaSeleccionadaParaCompletar) {
+        if (estadoRuta.modoLibre) {
+            if (!estadoRuta.categorias[categoriaSeleccionadaParaCompletar]) {
+                estadoRuta.categorias[categoriaSeleccionadaParaCompletar] = 0;
+            }
+            estadoRuta.categorias[categoriaSeleccionadaParaCompletar]++;
+        } else {
+            if (estadoRuta.categorias[categoriaSeleccionadaParaCompletar] > 0) {
+                estadoRuta.categorias[categoriaSeleccionadaParaCompletar]--;
+            }
+        }
+        guardarEnStorage();
+    }
+    categoriaSeleccionadaParaCompletar = null;
+    renderizarInterfaz();
+}
+
+function iniciarModoLibre() {
+    estadoRuta = {
+        enProgreso: true,
+        modoLibre: true,
+        categorias: {},
+        totalesIniciales: {}
+    };
+    guardarEnStorage();
+    vistaActual = "ruta";
     renderizarInterfaz();
 }
 
@@ -207,15 +385,78 @@ function renderizarHistorial() {
         
         datos.rutas.forEach(r => {
             const fFormat = new Date(r.fecha).toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+            
+            // Tarjeta principal interactiva
             const item = document.createElement("div");
-            item.className = "flex justify-between items-center bg-slate-900/40 p-2 rounded-lg";
-            item.innerHTML = `<span><i class="fa-solid fa-circle-check text-emerald-500/60 mr-2"></i>Ruta del ${fFormat}</span><span class="font-semibold text-slate-200">+${r.totalPuntos} pts</span>`;
+            item.className = "flex flex-col bg-slate-900/40 border border-slate-800/80 rounded-xl overflow-hidden transition-all";
+            
+            // Fila superior (La que se ve siempre)
+            const filaHeader = document.createElement("div");
+            filaHeader.className = "flex justify-between items-center p-3 cursor-pointer hover:bg-slate-800/40 active:scale-[0.99] transition-all select-none";
+            filaHeader.onclick = () => alternarDetalleHistorial(r.id);
+            filaHeader.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-circle-check text-emerald-500"></i>
+                    <span class="font-semibold text-slate-200">Recorrido del ${fFormat}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="font-bold text-sky-400">+${r.totalPuntos} pts</span>
+                    <i id="chevron-${r.id}" class="fa-solid fa-chevron-down text-slate-500 text-[10px] transition-transform duration-200"></i>
+                </div>
+            `;
+            
+            // Fila inferior desplegable (Detalles y botón de imagen)
+            const filaDetalle = document.createElement("div");
+            filaDetalle.id = `detalle-${r.id}`;
+            filaDetalle.className = "hidden bg-slate-950/60 p-3 border-t border-slate-800/60 space-y-3";
+            
+            let htmlDetallesPuntos = `<div class="space-y-1">`;
+            if (r.detalles && Object.keys(r.detalles).length > 0) {
+                Object.entries(r.detalles).forEach(([cat, cant]) => {
+                    if (cant > 0) {
+                        htmlDetallesPuntos += `
+                            <div class="flex justify-between text-[11px] text-slate-300">
+                                <span class="uppercase font-medium">${cat.toLowerCase()}</span>
+                                <span class="font-bold text-emerald-400">${cant}</span>
+                            </div>
+                        `;
+                    }
+                });
+            } else {
+                htmlDetallesPuntos += `<p class="text-[11px] text-slate-500 italic">Puntos consolidados (+${r.totalPuntos} pts)</p>`;
+            }
+            htmlDetallesPuntos += `</div>`;
+
+            filaDetalle.innerHTML = htmlDetallesPuntos + `
+                <button onclick="regenerarReporteHistorial(${r.id})" class="w-full bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold py-2 px-3 rounded-lg border border-emerald-500/30 active:scale-95 transition-all text-[11px] flex items-center justify-center gap-2 mt-2">
+                    <i class="fa-brands fa-whatsapp"></i> Generar Imagen de este Recorrido
+                </button>
+            `;
+
+            item.appendChild(filaHeader);
+            item.appendChild(filaDetalle);
             listaItems.appendChild(item);
         });
 
         bloqueCard.appendChild(listaItems);
         contenedor.appendChild(bloqueCard);
     });
+}
+
+// Función para abrir/cerrar el acordeón de detalles
+function alternarDetalleHistorial(id) {
+    const detalle = document.getElementById(`detalle-${id}`);
+    const chevron = document.getElementById(`chevron-${id}`);
+    if (detalle) {
+        const estaOculto = detalle.classList.contains("hidden");
+        if (estaOculto) {
+            detalle.classList.remove("hidden");
+            if (chevron) chevron.style.transform = "rotate(180deg)";
+        } else {
+            detalle.classList.add("hidden");
+            if (chevron) chevron.style.transform = "rotate(0deg)";
+        }
+    }
 }
 
 function renderizarGanancias() {
@@ -236,8 +477,39 @@ function renderizarGanancias() {
         }
     });
 
+    const dineroCorteActual = puntosCorteActual * 10000;
     document.getElementById("corte-actual-puntos").textContent = `${puntosCorteActual} pts`;
-    document.getElementById("corte-actual-dinero").textContent = `$${(puntosCorteActual * 10000).toLocaleString('es-CO')}`;
+    document.getElementById("corte-actual-dinero").textContent = `$${dineroCorteActual.toLocaleString('es-CO')}`;
+
+    // CÁLCULO DE LA META QUINCENAL
+    const porcentajeMeta = Math.min(100, Math.round((dineroCorteActual / metaQuincenalCOP) * 100));
+    const dineroFaltante = Math.max(0, metaQuincenalCOP - dineroCorteActual);
+
+    document.getElementById("meta-texto-monto").textContent = `$${dineroCorteActual.toLocaleString('es-CO')} / $${metaQuincenalCOP.toLocaleString('es-CO')}`;
+    document.getElementById("meta-porcentaje").textContent = `${porcentajeMeta}%`;
+    document.getElementById("meta-barra-fill").style.width = `${porcentajeMeta}%`;
+
+    if (dineroFaltante === 0) {
+        document.getElementById("meta-restante-texto").textContent = "🎉 ¡Meta quincenal cumplida con éxito!";
+        document.getElementById("meta-restante-texto").className = "text-[11px] text-emerald-400 font-bold text-right";
+    } else {
+        document.getElementById("meta-restante-texto").textContent = `Faltan $${dineroFaltante.toLocaleString('es-CO')} para cumplir la meta`;
+        document.getElementById("meta-restante-texto").className = "text-[11px] text-slate-400 italic text-right";
+    }
+}
+
+function configurarMetaQuincenal() {
+    const nuevaMetaInput = prompt("Ingresa el monto de tu meta financiera para cada corte quincenal (en COP):", metaQuincenalCOP);
+    if (nuevaMetaInput !== null) {
+        const valorParsed = parseInt(nuevaMetaInput.replace(/\D/g, ''), 10);
+        if (valorParsed && valorParsed > 0) {
+            metaQuincenalCOP = valorParsed;
+            localStorage.setItem("meta_quincenal_premium", metaQuincenalCOP.toString());
+            renderizarGanancias();
+        } else {
+            alert("Por favor ingresa un número válido mayor a cero.");
+        }
+    }
 }
 
 function borrarHistorialCompleto() {
@@ -288,38 +560,6 @@ function crearTarjetaPremium(nombre, cantidad, esModoConfirmacion = false) {
     tarjeta.appendChild(ladoIzquierdo);
     tarjeta.appendChild(divContador);
     return tarjeta;
-}
-
-function abrirConfirmacion(categoria) {
-    categoriaSeleccionadaParaCompletar = categoria;
-    ocultarTodasLasVistas();
-    document.getElementById("view-confirmacion").classList.remove("hidden");
-
-    let palabraSingular = categoria.toLowerCase();
-    if (palabraSingular.endsWith('s') && palabraSingular !== "comidas rapidas") {
-        palabraSingular = palabraSingular.slice(0, -1);
-    }
-    document.getElementById("confirmacion-texto").textContent = `¿Completaste 1 ${palabraSingular}?`;
-
-    const contenedorClon = document.getElementById("confirmacion-lista-clon");
-    contenedorClon.innerHTML = "";
-    Object.entries(estadoRuta.categorias).filter(([_, cant]) => cant > 0).forEach(([nombre, cantidad]) => {
-        contenedorClon.appendChild(crearTarjetaPremium(nombre, Math.max(0, cantidad), true));
-    });
-}
-
-function cancelarConfirmacion() {
-    categoriaSeleccionadaParaCompletar = null;
-    renderizarInterfaz();
-}
-
-function confirmarTarea() {
-    if (categoriaSeleccionadaParaCompletar && estadoRuta.categorias[categoriaSeleccionadaParaCompletar] > 0) {
-        estadoRuta.categorias[categoriaSeleccionadaParaCompletar]--;
-        guardarEnStorage();
-    }
-    categoriaSeleccionadaParaCompletar = null;
-    renderizarInterfaz();
 }
 
 function irACrearRuta() {
@@ -377,7 +617,13 @@ function cancelarCreacion() {
 }
 
 function forzarFinRuta() {
-    if(confirm("¿Seguro deseas finalizar el recorrido actual? Los puntos validados se registrarán en tu historial quincenal.")){
+    if(confirm("¿Deseas finalizar la jornada actual? Los puntos que efectivamente registraste se guardarán en tu historial de ganancias.")){
+        archivarRutaActual();
+    }
+}
+
+function archivarRutaManual() {
+    if(confirm("¿Deseas archivar este recorrido y guardarlo en el historial quincenal?")){
         archivarRutaActual();
     }
 }
@@ -400,22 +646,11 @@ function guardarNuevaRuta() {
         return;
     }
 
-    estadoRuta = { enProgreso: true, categorias: nuevasCategorias, totalesIniciales: nuevosTotales };
+    estadoRuta = { enProgreso: true, modoLibre: false, categorias: nuevasCategorias, totalesIniciales: nuevosTotales };
     guardarEnStorage();
     vistaActual = "ruta";
     renderizarInterfaz();
 }
-
-function registrarServiceWorker() {
-    if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-            navigator.serviceWorker.register("sw.js")
-                .then(reg => console.log("PWA cargada:", reg.scope))
-                .catch(err => console.error("Error worker:", err));
-        });
-    }
-}
-
 
 function generarReporteImagen() {
     if (!estadoRuta.enProgreso) {
@@ -431,11 +666,10 @@ function generarReporteImagen() {
     reporteDiv.style.top = "-9999px";
     reporteDiv.className = "w-[360px] bg-[#0f172a] text-slate-100 p-6 font-sans flex flex-col gap-5 border border-slate-800";
     
-    // Header con tablas clásicas para asegurar espaciado en la captura
     let htmlContenido = `
         <div style="border-bottom: 2px solid rgba(56, 189, 248, 0.2); padding-bottom: 12px; display: table; width: 100%;">
             <div style="display: table-cell; vertical-align: middle;">
-                <h2 style="font-size: 16px; font-weight: 900; color: #fff; margin: 0; tracking-tight">RouteTask Pro</h2>
+                <h2 style="font-size: 16px; font-weight: 900; color: #fff; margin: 0;">RouteTask Pro</h2>
                 <p style="font-size: 10px; color: #38bdf8; font-weight: 700; margin: 0; text-transform: uppercase; letter-spacing: 0.05em;">Reporte de Cobertura</p>
             </div>
             <div style="display: table-cell; text-align: right; vertical-align: middle; font-size: 11px; color: #94a3b8; font-weight: 600;">
@@ -444,7 +678,6 @@ function generarReporteImagen() {
         </div>
     `;
 
-    // 1. SECCIÓN: PUNTOS VISITADOS (COMPLETADOS)
     htmlContenido += `
         <div>
             <h3 style="font-size: 12px; font-weight: 800; color: #10b981; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.05em;"><i class="fa-solid fa-circle-check" style="margin-right: 6px;"></i>Puntos Visitados</h3>
@@ -452,62 +685,71 @@ function generarReporteImagen() {
     `;
     
     let tieneVisitados = false;
-    Object.keys(CATEGORIAS_CONFIG).forEach(cat => {
-        const inicial = estadoRuta.totalesIniciales[cat] || 0;
-        const faltante = estadoRuta.categorias[cat] || 0;
-        const visitados = inicial - faltante;
-        
-        if (visitados > 0) {
-            tieneVisitados = true;
-            htmlContenido += `
-                <div style="background: rgba(30, 41, 59, 0.4); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03); display: table; width: 100%;">
-                    <div style="display: table-cell; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 12px; color: #cbd5e1;">
-                        ${cat}
+
+    if (estadoRuta.modoLibre) {
+        Object.keys(CATEGORIAS_CONFIG).forEach(cat => {
+            const realizado = estadoRuta.categorias[cat] || 0;
+            if (realizado > 0) {
+                tieneVisitados = true;
+                htmlContenido += `
+                    <div style="background: rgba(30, 41, 59, 0.4); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03); display: table; width: 100%;">
+                        <div style="display: table-cell; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 12px; color: #cbd5e1;">${cat}</div>
+                        <div style="display: table-cell; text-align: right; font-weight: 900; color: #10b981; font-size: 14px;">${realizado}</div>
                     </div>
-                    <div style="display: table-cell; text-align: right; font-weight: 900; color: #10b981; font-size: 14px;">
-                        ${visitados}
+                `;
+            }
+        });
+    } else {
+        Object.keys(CATEGORIAS_CONFIG).forEach(cat => {
+            const inicial = estadoRuta.totalesIniciales[cat] || 0;
+            const faltante = estadoRuta.categorias[cat] || 0;
+            const visitados = inicial - faltante;
+            
+            if (visitados > 0) {
+                tieneVisitados = true;
+                htmlContenido += `
+                    <div style="background: rgba(30, 41, 59, 0.4); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03); display: table; width: 100%;">
+                        <div style="display: table-cell; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 12px; color: #cbd5e1;">${cat}</div>
+                        <div style="display: table-cell; text-align: right; font-weight: 900; color: #10b981; font-size: 14px;">${visitados}</div>
                     </div>
-                </div>
-            `;
-        }
-    });
+                `;
+            }
+        });
+    }
+
     if (!tieneVisitados) {
         htmlContenido += `<p style="font-size: 11px; color: #64748b; font-style: italic; margin: 4px 0; padding-left: 4px;">Ninguno.</p>`;
     }
     htmlContenido += `</div></div>`;
 
-    // 2. SECCIÓN: PUNTOS RESTANTES (PENDIENTES)
-    htmlContenido += `
-        <div style="margin-top: 2px;">
-            <h3 style="font-size: 12px; font-weight: 800; color: #f59e0b; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.05em;"><i class="fa-solid fa-clock" style="margin-right: 6px;"></i>Puntos Restantes</h3>
-            <div style="display: flex; flex-direction: column; gap: 6px;">
-    `;
-    
-    let tieneRestantes = false;
-    Object.keys(CATEGORIAS_CONFIG).forEach(cat => {
-        const faltante = estadoRuta.categorias[cat] || 0;
+    if (!estadoRuta.modoLibre) {
+        htmlContenido += `
+            <div style="margin-top: 2px;">
+                <h3 style="font-size: 12px; font-weight: 800; color: #f59e0b; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.05em;"><i class="fa-solid fa-clock" style="margin-right: 6px;"></i>Puntos Restantes</h3>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+        `;
         
-        if (faltante > 0) {
-            tieneRestantes = true;
-            htmlContenido += `
-                <div style="background: rgba(30, 41, 59, 0.4); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03); display: table; width: 100%;">
-                    <div style="display: table-cell; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 12px; color: #cbd5e1;">
-                        ${cat}
+        let tieneRestantes = false;
+        Object.keys(CATEGORIAS_CONFIG).forEach(cat => {
+            const faltante = estadoRuta.categorias[cat] || 0;
+            if (faltante > 0) {
+                tieneRestantes = true;
+                htmlContenido += `
+                    <div style="background: rgba(30, 41, 59, 0.4); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03); display: table; width: 100%;">
+                        <div style="display: table-cell; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 12px; color: #cbd5e1;">${cat}</div>
+                        <div style="display: table-cell; text-align: right; font-weight: 900; color: #f59e0b; font-size: 14px;">${faltante}</div>
                     </div>
-                    <div style="display: table-cell; text-align: right; font-weight: 900; color: #f59e0b; font-size: 14px;">
-                        ${faltante}
-                    </div>
-                </div>
-            `;
+                `;
+            }
+        });
+        if (!tieneRestantes) {
+            htmlContenido += `<p style="font-size: 12px; color: #10b981; font-weight: 700; font-style: italic; margin: 4px 0; padding-left: 4px;"><i class="fa-solid fa-star mr-1"></i> ¡Todo cubierto al 100%!</p>`;
         }
-    });
-    if (!tieneRestantes) {
-        htmlContenido += `<p style="font-size: 12px; color: #10b981; font-weight: 700; font-style: italic; margin: 4px 0; padding-left: 4px;"><i class="fa-solid fa-star mr-1"></i> ¡Todo cubierto al 100%!</p>`;
+        htmlContenido += `</div></div>`;
     }
-    htmlContenido += `</div></div>`;
 
     htmlContenido += `
-        <div style="margin-top: 6px; text-align: center; font-size: 10px; color: #475569; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px; font-weight: 600; tracking-wide">
+        <div style="margin-top: 6px; text-align: center; font-size: 10px; color: #475569; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px; font-weight: 600;">
             Generado automáticamente desde RouteTask Pro
         </div>
     `;
@@ -515,10 +757,7 @@ function generarReporteImagen() {
     reporteDiv.innerHTML = htmlContenido;
     document.body.appendChild(reporteDiv);
 
-    html2canvas(reporteDiv, {
-        backgroundColor: "#0f172a",
-        scale: 2 
-    }).then(canvas => {
+    html2canvas(reporteDiv, { backgroundColor: "#0f172a", scale: 2 }).then(canvas => {
         const urlImagen = canvas.toDataURL("image/png");
         const enlaceDescarga = document.createElement("a");
         enlaceDescarga.download = `Reporte_Ruta_${hoy.replace(/\//g, '-')}.png`;
@@ -526,14 +765,138 @@ function generarReporteImagen() {
         enlaceDescarga.click();
         document.body.removeChild(reporteDiv);
     }).catch(err => {
-        console.error("Error al generar la imagen:", err);
-        alert("Ocurrió un inconveniente al procesar la captura.");
+        console.error("Error al generar imagen:", err);
+        alert("Ocurrió un inconveniente.");
         document.body.removeChild(reporteDiv);
     });
 }
 
-function archivarRutaManual() {
-    if(confirm("¿Deseas archivar este recorrido y guardarlo en el historial quincenal?")){
-        archivarRutaActual();
+function registrarServiceWorker() {
+    if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+            navigator.serviceWorker.register("sw.js")
+                .then(reg => console.log("PWA cargada:", reg.scope))
+                .catch(err => console.error("Error worker:", err));
+        });
     }
+}
+
+function regenerarReporteHistorial(idRuta) {
+    const rutaEncontrada = historialRutas.find(r => r.id === idRuta);
+    if (!rutaEncontrada) {
+        alert("No se encontraron los datos de este recorrido.");
+        return;
+    }
+
+    const fechaRuta = new Date(rutaEncontrada.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    
+    const reporteDiv = document.createElement("div");
+    reporteDiv.style.position = "absolute";
+    reporteDiv.style.left = "-9999px";
+    reporteDiv.style.top = "-9999px";
+    reporteDiv.className = "w-[360px] bg-[#0f172a] text-slate-100 p-6 font-sans flex flex-col gap-5 border border-slate-800";
+    
+    let htmlContenido = `
+        <div style="border-bottom: 2px solid rgba(56, 189, 248, 0.2); padding-bottom: 12px; display: table; width: 100%;">
+            <div style="display: table-cell; vertical-align: middle;">
+                <h2 style="font-size: 16px; font-weight: 900; color: #fff; margin: 0;">RouteTask Pro</h2>
+                <p style="font-size: 10px; color: #38bdf8; font-weight: 700; margin: 0; text-transform: uppercase; letter-spacing: 0.05em;">Reporte de Cobertura</p>
+            </div>
+            <div style="display: table-cell; text-align: right; vertical-align: middle; font-size: 11px; color: #94a3b8; font-weight: 600;">
+                ${fechaRuta}
+            </div>
+        </div>
+    `;
+
+    htmlContenido += `
+        <div>
+            <h3 style="font-size: 12px; font-weight: 800; color: #10b981; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.05em;"><i class="fa-solid fa-circle-check" style="margin-right: 6px;"></i>Puntos Visitados</h3>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+    `;
+    
+    if (rutaEncontrada.detalles && Object.keys(rutaEncontrada.detalles).length > 0) {
+        Object.entries(rutaEncontrada.detalles).forEach(([cat, cant]) => {
+            if (cant > 0) {
+                htmlContenido += `
+                    <div style="background: rgba(30, 41, 59, 0.4); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03); display: table; width: 100%;">
+                        <div style="display: table-cell; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 12px; color: #cbd5e1;">${cat}</div>
+                        <div style="display: table-cell; text-align: right; font-weight: 900; color: #10b981; font-size: 14px;">${cant}</div>
+                    </div>
+                `;
+            }
+        });
+    } else {
+        htmlContenido += `
+            <div style="background: rgba(30, 41, 59, 0.4); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03); display: table; width: 100%;">
+                <div style="display: table-cell; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 12px; color: #cbd5e1;">PUNTOS CONSOLIDADOS</div>
+                <div style="display: table-cell; text-align: right; font-weight: 900; color: #10b981; font-size: 14px;">${rutaEncontrada.totalPuntos}</div>
+            </div>
+        `;
+    }
+
+    htmlContenido += `</div></div>`;
+
+    htmlContenido += `
+        <div style="margin-top: 6px; text-align: center; font-size: 10px; color: #475569; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px; font-weight: 600;">
+            Generado automáticamente desde RouteTask Pro
+        </div>
+    `;
+
+    reporteDiv.innerHTML = htmlContenido;
+    document.body.appendChild(reporteDiv);
+
+    html2canvas(reporteDiv, { backgroundColor: "#0f172a", scale: 2 }).then(canvas => {
+        const urlImagen = canvas.toDataURL("image/png");
+        const enlaceDescarga = document.createElement("a");
+        enlaceDescarga.download = `Reporte_Ruta_${fechaRuta.replace(/\//g, '-')}.png`;
+        enlaceDescarga.href = urlImagen;
+        enlaceDescarga.click();
+        document.body.removeChild(reporteDiv);
+    }).catch(err => {
+        console.error("Error al generar imagen:", err);
+        alert("Ocurrió un inconveniente.");
+        document.body.removeChild(reporteDiv);
+    });
+}
+function exportarExcelCSV() {
+    if (historialRutas.length === 0) {
+        alert("No hay ningún registro en el historial para exportar.");
+        return;
+    }
+
+    // Encabezados del archivo CSV
+    let csvContent = "\uFEFF"; // BOM UTF-8 para que Excel abra los acentos correctamente
+    csvContent += "ID Registro;Fecha;Hora;Corte Quincenal;Categorias y Visitas;Total Puntos;Ganancia COP\n";
+
+    historialRutas.forEach(r => {
+        const d = new Date(r.fecha);
+        const fechaFormat = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const horaFormat = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        const corteNombre = obtenerPeriodoCorte(r.fecha);
+        
+        let desgloseTexto = "";
+        if (r.detalles && Object.keys(r.detalles).length > 0) {
+            desgloseTexto = Object.entries(r.detalles)
+                .filter(([_, cant]) => cant > 0)
+                .map(([cat, cant]) => `${cat}: ${cant}`)
+                .join(" | ");
+        } else {
+            desgloseTexto = "Recorrido Consolidado";
+        }
+
+        const ganancia = r.totalPuntos * 10000;
+
+        // Fila formateada
+        csvContent += `"${r.id}";"${fechaFormat}";"${horaFormat}";"${corteNombre}";"${desgloseTexto}";"${r.totalPuntos}";"$${ganancia.toLocaleString('es-CO')}"\n`;
+    });
+
+    // Descargar el archivo generado
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Reporte_Rutas_RouteTask_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
