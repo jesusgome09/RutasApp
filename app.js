@@ -462,26 +462,39 @@ function alternarDetalleHistorial(id) {
 function renderizarGanancias() {
     document.getElementById("view-ganancias").classList.remove("hidden");
 
+    // Total acumulado absoluto
     const totalPuntosHistoricos = historialRutas.reduce((acc, r) => acc + r.totalPuntos, 0);
     const totalDineroHistorico = totalPuntosHistoricos * 10000;
 
     document.getElementById("ganancia-total").textContent = `$${totalDineroHistorico.toLocaleString('es-CO')}`;
     document.getElementById("total-puntos-completados").textContent = `${totalPuntosHistoricos} puntos liquidados en total en la app`;
 
+    // Identificar el nombre del corte actual en curso
     const corteActualNombre = obtenerPeriodoCorte(new Date().toISOString());
     let puntosCorteActual = 0;
 
+    // Agrupar todas las rutas guardadas por su respectivo periodo de corte
+    const cortesAgrupados = {};
+
     historialRutas.forEach(ruta => {
-        if (obtenerPeriodoCorte(ruta.fecha) === corteActualNombre) {
+        const nombrePeriodo = obtenerPeriodoCorte(ruta.fecha);
+        
+        if (!cortesAgrupados[nombrePeriodo]) {
+            cortesAgrupados[nombrePeriodo] = 0;
+        }
+        cortesAgrupados[nombrePeriodo] += ruta.totalPuntos;
+
+        if (nombrePeriodo === corteActualNombre) {
             puntosCorteActual += ruta.totalPuntos;
         }
     });
 
+    // Actualizar el bloque de la Quincena Actual
     const dineroCorteActual = puntosCorteActual * 10000;
     document.getElementById("corte-actual-puntos").textContent = `${puntosCorteActual} pts`;
     document.getElementById("corte-actual-dinero").textContent = `$${dineroCorteActual.toLocaleString('es-CO')}`;
 
-    // CÁLCULO DE LA META QUINCENAL
+    // Cálculo de la Meta Quincenal
     const porcentajeMeta = Math.min(100, Math.round((dineroCorteActual / metaQuincenalCOP) * 100));
     const dineroFaltante = Math.max(0, metaQuincenalCOP - dineroCorteActual);
 
@@ -496,6 +509,44 @@ function renderizarGanancias() {
         document.getElementById("meta-restante-texto").textContent = `Faltan $${dineroFaltante.toLocaleString('es-CO')} para cumplir la meta`;
         document.getElementById("meta-restante-texto").className = "text-[11px] text-slate-400 italic text-right";
     }
+
+    // RENDERIZAR HISTORIAL DE GANANCIAS POR CORTES ANTERIORES
+    const contenedorGananciasHistorial = document.getElementById("contenedor-historial-ganancias");
+    contenedorGananciasHistorial.innerHTML = "";
+
+    const periodosExistentes = Object.keys(cortesAgrupados);
+
+    if (periodosExistentes.length === 0) {
+        contenedorGananciasHistorial.innerHTML = `<p class="text-center text-xs text-slate-500 py-4">No hay cortes liquidados aún.</p>`;
+        return;
+    }
+
+    periodosExistentes.forEach(periodoNombre => {
+        const puntosPeriodo = cortesAgrupados[periodoNombre];
+        const dineroPeriodo = puntosPeriodo * 10000;
+        const esElActual = (periodoNombre === corteActualNombre);
+
+        const cardCorte = document.createElement("div");
+        cardCorte.className = `glass-card rounded-xl p-3.5 flex items-center justify-between border ${esElActual ? 'border-sky-500/40 bg-sky-500/5' : 'border-slate-800 bg-slate-900/40'}`;
+
+        cardCorte.innerHTML = `
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg ${esElActual ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'} flex items-center justify-center text-sm font-bold">
+                    <i class="fa-solid ${esElActual ? 'fa-spinner animate-spin' : 'fa-circle-dollar-to-slot'}"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-bold text-slate-200">${periodoNombre}</p>
+                    <p class="text-[10px] text-slate-400">${puntosPeriodo} puntos realizados ${esElActual ? '(En progreso)' : '(Cerrado)'}</p>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-sm font-black text-emerald-400">$${dineroPeriodo.toLocaleString('es-CO')}</p>
+                <span class="text-[9px] uppercase font-extrabold tracking-wider ${esElActual ? 'text-sky-400' : 'text-slate-500'}">${esElActual ? 'Actual' : 'Liquidado'}</span>
+            </div>
+        `;
+
+        contenedorGananciasHistorial.appendChild(cardCorte);
+    });
 }
 
 function configurarMetaQuincenal() {
